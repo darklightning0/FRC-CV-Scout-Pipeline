@@ -73,7 +73,7 @@ import {
   GameSpecificQuestions,
   GameSpecificScoutOptions,
 } from "@/game-template/components";
-import logo from "../src/assets/Maneuver Wordmark Vertical.png";
+import logo from "../src/assets/huntereyes-logo.jpeg";
 import { generateDemoEvent, generateDemoEventScheduleOnly } from "@/core/lib/demoDataGenerator";
 import { generate2026GameData } from "@/game-template/demoDataGenerator2026";
 import { db, pitDB, gameDB } from "@/db";
@@ -237,7 +237,7 @@ function App() {
           element={
             <HomePage 
               logo={logo} 
-              appName="Maneuver 2026"
+              appName="Hunter Eyes"
               version="2026.8.0"
               onLoadDemoData={loadDemoData}
               onLoadDemoScheduleOnly={loadDemoScheduleOnly}

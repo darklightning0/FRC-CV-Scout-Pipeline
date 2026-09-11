@@ -7,15 +7,15 @@ export interface PageHelpConfig {
 
 export const PAGE_HELP_CONFIG: Record<string, PageHelpConfig> = {
   "/": {
-    title: "Welcome to Maneuver!",
+    title: "Welcome to Hunter Eyes!",
     content: [
-      "This is the home page of Maneuver, your comprehensive FRC scouting solution.",
+      "This is the home page of Hunter Eyes, your comprehensive FRC scouting solution.",
       "To get started, you can load demo data to explore the app's features, or use the sidebar menu to navigate to different sections.",
       "Demo data includes 51 sample matches and 14 teams to help you understand how the scouting system works.",
       "Use the sidebar menu to access scouting forms, data management, and strategy tools.",
       "Each page has detailed help available via tooltips or dialogs.",
       "Click the ❓ icon on each page for quick tips or in-depth tutorials.",
-      "Install the Maneuver app on your device for the best experience. On Android, go to the browser settings, enable 'Add to Home Screen', and follow the prompts. On Safari in iOS, use the share button and select 'Add to Home Screen'.",
+      "Install the Hunter Eyes app on your device for the best experience. On Android, go to the browser settings, enable 'Add to Home Screen', and follow the prompts. On Safari in iOS, use the share button and select 'Add to Home Screen'.",
       "For more information, visit our GitHub repository."
     ]
   },
@@ -253,7 +253,7 @@ export const PAGE_HELP_CONFIG: Record<string, PageHelpConfig> = {
       "**Best Practices:**",
       "- Scouting leads should use this to collect data from scouts throughout events perfect for collecting data in batches so you don't have to collect after every match",
       "- Transfer data to drive teams in the pit for real-time strategy updates",
-      "- Share with other teams using Maneuver for collaborative scouting",
+      "- Share with other teams using Hunter Eyes for collaborative scouting",
       "- Use good lighting and keep devices steady during transfer",
       "- Allow time for complete scanning - rushing can cause data corruption"
     ]

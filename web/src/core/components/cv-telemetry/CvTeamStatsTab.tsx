@@ -240,7 +240,7 @@ export function CvTeamStatsTab({
           {usingBuiltinApi ? (
             <>
               Scouts only need Wi‑Fi and this app — same idea as TBA. Your analyst laptop publishes
-              finished matches to the Maneuver site; this tab auto-syncs every{' '}
+              finished matches to the Hunter Eyes site; this tab auto-syncs every{' '}
               {Math.round(CV_API_POLL_INTERVAL_MS / 1000)}s. Event:{' '}
               <code className="text-xs">{eventForSync || '(set event code first)'}</code>
             </>
@@ -270,7 +270,7 @@ export function CvTeamStatsTab({
               onClick={() => {
                 clearStoredCvSyncBaseUrl();
                 setSyncBaseUrl(getBuiltinCvApiBaseUrl());
-                toast.info('Reset to Maneuver cloud CV API');
+                toast.info('Reset to Hunter Eyes cloud CV API');
               }}
             >
               Use app default

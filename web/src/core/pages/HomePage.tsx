@@ -36,7 +36,7 @@ interface HomePageProps {
 
 const HomePage = ({
   logo,
-  appName = "Maneuver",
+  appName = "Hunter Eyes",
   version = "2026.8.0",
   onLoadDemoData,
   onLoadDemoScheduleOnly,
@@ -181,10 +181,10 @@ const HomePage = ({
           {logo ? (
             <img
               src={logo}
-              width="600"
+              width="240"
               height="240"
               alt={`${appName} Logo`}
-              className="dark:invert"
+              className="mx-auto h-40 w-auto object-contain dark:invert"
             />
           ) : (
             <div className="text-4xl font-bold">{appName}</div>

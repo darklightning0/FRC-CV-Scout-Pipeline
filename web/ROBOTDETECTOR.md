@@ -1,20 +1,8 @@
-# Web frontend
+# Hunter Eyes web app + RobotDetector CV
 
-This folder is the **[Maneuver-2026](https://github.com/ShinyShips/Maneuver-2026)** FRC scouting app (copied in so the UI/features match the upstream example).
+This folder is the **Hunter Eyes** FRC scouting / strategy PWA (forked from Maneuver-2026 so UI features match the upstream template).
 
-## Run
+- Live site: https://huntereyes.netlify.app  
+- Repo: https://github.com/darklightning0/FRC-CV-Scout-Pipeline  
 
-```bash
-cd web
-npm install
-npm run dev
-```
-
-Open http://127.0.0.1:5173/
-
-Optional API keys (TBA / Nexus) go in `web/.env` — see `.env.example`.
-
-## Notes
-
-- Previous custom Vite scout UI is preserved under `../web-legacy/` for reference.
-- Python CV / robot tracking code stays in the repo root (`src/`, `models/`, etc.) and is separate from this app.
+Computer-vision telemetry from the Python `RobotDetector` pipeline syncs into Dexie `cvMatchTelemetry` and never overwrites human scout paths.

@@ -1,7 +1,7 @@
 /**
- * Cloud CV API for Maneuver (Netlify Function + Blobs).
+ * Cloud CV API for Hunter Eyes (Netlify Function + Blobs).
  *
- * Scouts only need Wi‑Fi + the deployed Maneuver site — they poll this like TBA.
+ * Scouts only need Wi‑Fi + the deployed Hunter Eyes site — they poll this like TBA.
  * Your laptop POSTs finished bundles here (one watcher process; no second terminal for scouts).
  *
  * GET  /.netlify/functions/cv-api?action=index&event=2026tuis2

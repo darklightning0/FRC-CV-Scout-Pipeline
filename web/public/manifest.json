@@ -1,7 +1,7 @@
 {
-  "name": "Maneuver - A FRC Strategy Suite",
-  "short_name": "Maneuver FRC",
-  "description": "Maneuver is a FRC Strategy Suite designed for offline first robotics competition scouting.",
+  "name": "Hunter Eyes - FRC Strategy & CV Scouting",
+  "short_name": "Hunter Eyes",
+  "description": "Hunter Eyes is an offline-first FRC strategy and scouting suite with computer-vision match telemetry.",
   "theme_color": "#0f172a",
   "background_color": "#0f172a",
   "display": "standalone",
@@ -38,21 +38,21 @@
       "sizes": "1920x1079",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Maneuver desktop view"
+      "label": "Hunter Eyes desktop view"
     },
     {
       "src": "/screenshots/mobile-screenshot.png",
       "sizes": "430x932", 
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Maneuver mobile view"
+      "label": "Hunter Eyes mobile view"
     }
   ],
   "icons": [
     {
-      "src": "/Icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any"
     },
     {

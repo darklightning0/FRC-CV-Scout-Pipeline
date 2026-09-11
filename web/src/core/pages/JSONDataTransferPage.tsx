@@ -190,7 +190,7 @@ const JSONDataTransferPage = () => {
           const finalDataArr = [dynamicHeader, ...dataArrays];
 
           csv = convertArrayOfArraysToCSV(finalDataArr as (string | number)[][]);
-          filename = `ManeuverScoutingData-${new Date().toLocaleTimeString()}-local.csv`;
+          filename = `HunterEyesScoutingData-${new Date().toLocaleTimeString()}-local.csv`;
           break;
         }
         case 'pitScouting': {
@@ -199,7 +199,7 @@ const JSONDataTransferPage = () => {
             alert("No pit scouting data found.");
             return;
           }
-          filename = `ManeuverPitScoutingData-${new Date().toLocaleTimeString()}-local.csv`;
+          filename = `HunterEyesPitScoutingData-${new Date().toLocaleTimeString()}-local.csv`;
           break;
         }
         case 'pitScoutingImagesOnly': {
@@ -227,7 +227,7 @@ const JSONDataTransferPage = () => {
           });
 
           csv = convertArrayOfArraysToCSV([header, ...rows]);
-          filename = `ManeuverMatchSchedule-${new Date().toLocaleTimeString()}-local.csv`;
+          filename = `HunterEyesMatchSchedule-${new Date().toLocaleTimeString()}-local.csv`;
           break;
         }
         case 'scoutProfiles': {
@@ -258,7 +258,7 @@ const JSONDataTransferPage = () => {
 
           const scoutCsvData = [scoutHeaders, ...scoutRows];
           csv = convertArrayOfArraysToCSV(scoutCsvData as (string | number)[][]);
-          filename = `ManeuverScoutProfiles-${new Date().toLocaleTimeString()}-local.csv`;
+          filename = `HunterEyesScoutProfiles-${new Date().toLocaleTimeString()}-local.csv`;
           break;
         }
         default:
@@ -294,7 +294,7 @@ const JSONDataTransferPage = () => {
           }
 
           dataToExport = { entries: scoutingEntries };
-          filename = `ManeuverScoutingData-${new Date().toLocaleTimeString()}.json`;
+          filename = `HunterEyesScoutingData-${new Date().toLocaleTimeString()}.json`;
           break;
         }
         case 'pitScouting': {
@@ -306,7 +306,7 @@ const JSONDataTransferPage = () => {
           }
 
           dataToExport = pitData;
-          filename = `ManeuverPitScoutingData-${new Date().toLocaleTimeString()}.json`;
+          filename = `HunterEyesPitScoutingData-${new Date().toLocaleTimeString()}.json`;
           break;
         }
         case 'pitScoutingImagesOnly': {
@@ -331,7 +331,7 @@ const JSONDataTransferPage = () => {
           }
 
           dataToExport = payload;
-          filename = `ManeuverMatchSchedule-${new Date().toLocaleTimeString()}.json`;
+          filename = `HunterEyesMatchSchedule-${new Date().toLocaleTimeString()}.json`;
           break;
         }
         case 'scoutProfiles': {
@@ -349,7 +349,7 @@ const JSONDataTransferPage = () => {
             exportedAt: new Date().toISOString(),
             version: "1.0"
           };
-          filename = `ManeuverScoutProfiles-${new Date().toLocaleTimeString()}.json`;
+          filename = `HunterEyesScoutProfiles-${new Date().toLocaleTimeString()}.json`;
           break;
         }
         default:

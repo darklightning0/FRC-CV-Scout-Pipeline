@@ -17,7 +17,7 @@ import {
   useSidebar,
 } from "@/core/components/ui/sidebar"
 import { Separator } from "@/core/components/ui/separator"
-import ManeuverHorizontalLogo from "@/assets/Maneuver Wordmark Horizontal.png"
+import HunterEyesHorizontalLogo from "@/assets/huntereyes-horizontal.png"
 import { haptics } from "@/core/lib/haptics"
 
 const data = {
@@ -224,11 +224,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button] h-fit"
             >
               <img
-                src={ManeuverHorizontalLogo}
+                src={HunterEyesHorizontalLogo}
                 className="row-span-4 scale-75 dark:invert"
                 width="240"
-                height="160"
-                alt="Maneuver Logo Wordmark Horizontal"
+                height="56"
+                alt="Hunter Eyes"
               />
             </SidebarMenuButton>
             <Separator className="my-1" />

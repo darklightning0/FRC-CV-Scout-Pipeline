@@ -1,7 +1,7 @@
 /**
  * Pull AI scout bundles into Dexie (TBA-style poll).
  *
- * Default: same-origin Netlify function (scouts only need Wi‑Fi + open Maneuver).
+ * Default: same-origin Netlify function (scouts only need Wi‑Fi + open Hunter Eyes).
  * Optional override: local sync server / tunnel URL in localStorage or VITE_CV_API_URL.
  */
 

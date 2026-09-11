@@ -1,5 +1,5 @@
 /**
- * Convert RobotDetector AI scout bundle coordinates → Maneuver field space.
+ * Convert RobotDetector AI scout bundle coordinates → Hunter Eyes field space.
  *
  * Canonical storage: blue-alliance perspective, normalized 0–1
  * (X: blue wall → red wall, Y: near → far). FieldCanvas mirrors for red.

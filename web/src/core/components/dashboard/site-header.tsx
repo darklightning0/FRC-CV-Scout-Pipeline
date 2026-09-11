@@ -117,7 +117,7 @@ export function SiteHeader() {
           </div>
           <Button variant="ghost" className="hidden sm:flex w-auto h-auto px-6">
             <a
-              href="https://github.com/ShinyShips/Maneuver-2026"
+              href="https://github.com/darklightning0/FRC-CV-Scout-Pipeline"
               rel="noopener noreferrer"
               target="_blank"
               className="dark:text-foreground"

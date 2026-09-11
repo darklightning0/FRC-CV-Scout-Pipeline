@@ -17,9 +17,9 @@ export default defineConfig(({ mode }) => ({
         enabled: false, // Disabled in dev to prevent false update prompts - only active in production
       },
       manifest: {
-        name: "Maneuver - A FRC Strategy Suite",
-        short_name: "Maneuver FRC",
-        description: "Maneuver is a FRC Strategy Suite designed for offline first robotics competition scouting.",
+        name: "Hunter Eyes - FRC Strategy & CV Scouting",
+        short_name: "Hunter Eyes",
+        description: "Hunter Eyes is an offline-first FRC strategy and scouting suite with computer-vision match telemetry.",
         theme_color: "#0f172a",
         background_color: "#0f172a",
         display: "standalone",

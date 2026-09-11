@@ -1,5 +1,5 @@
 /**
- * Computer-vision match telemetry (RobotDetector → Maneuver)
+ * Computer-vision match telemetry (RobotDetector → Hunter Eyes)
  *
  * Stored separately from human scout entries. Never overwrites
  * scoutingData.autoPath / teleopPath.

@@ -42,6 +42,13 @@ DEFAULT_MATCH_KEY = ""  # Required unless set via --match-key / watcher
 VIDEO_URL = DEFAULT_VIDEO_URL
 TEMP_VIDEO = PROJECT_ROOT / "outputs" / "temp_1080p_match.mp4"  # legacy fallback only
 
+# Source video quality target for YOLO / OCR (FIRST YouTube streams when available)
+TARGET_HEIGHT = 1080
+TARGET_FPS = 60
+# Accept slight under-target (e.g. 1078px crop, 59.94 fps)
+MIN_ACCEPT_HEIGHT = 1000
+MIN_ACCEPT_FPS = 50
+
 OUTPUT_VIDEO = OUTPUT_DIR / "annotated_last_run.mp4"
 
 # ---------------------------------------------------------------------------
@@ -143,8 +150,26 @@ COAST_COLORS = {
 # STEP 1 — VIDEO INGESTION
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _probe_video(path: Path) -> tuple[bool, float, float, float, float]:
+    """Return (ok, width, height, fps, frame_count)."""
+    cap = cv2.VideoCapture(str(path))
+    if not cap.isOpened():
+        return False, 0.0, 0.0, 0.0, 0.0
+    width = float(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+    height = float(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+    fps = float(cap.get(cv2.CAP_PROP_FPS) or 0)
+    frames = float(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    cap.release()
+    ok = frames > 0 and width > 0 and height > 0
+    return ok, width, height, fps, frames
+
+
+def _meets_quality_target(height: float, fps: float) -> bool:
+    return height >= MIN_ACCEPT_HEIGHT and fps >= MIN_ACCEPT_FPS
+
+
 def download_video(url: str, output_path: Path) -> Path:
-    """Download the match video from YouTube at 1080p using yt-dlp."""
+    """Download the match video from YouTube preferring 1080p60 via yt-dlp."""
     import yt_dlp
     import yt_dlp.utils  # type: ignore
 
@@ -154,13 +179,23 @@ def download_video(url: str, output_path: Path) -> Path:
     if output_path.exists():
         cached_url = url_sidecar.read_text().strip() if url_sidecar.exists() else ""
         size_mb = output_path.stat().st_size / (1024 * 1024)
-        cached_video = cv2.VideoCapture(str(output_path))
-        is_readable = cached_video.isOpened() and cached_video.get(cv2.CAP_PROP_FRAME_COUNT) > 0
-        cached_video.release()
-        if size_mb > 1.0 and is_readable and cached_url == url:
-            print(f"[DOWNLOAD] Using cached video ({size_mb:.1f} MB): {output_path.name}")
+        ok, width, height, fps, _frames = _probe_video(output_path)
+        quality_ok = ok and _meets_quality_target(height, fps)
+        if size_mb > 1.0 and ok and cached_url == url and quality_ok:
+            print(
+                f"[DOWNLOAD] Using cached video "
+                f"({width:.0f}x{height:.0f} @ {fps:.1f} fps, {size_mb:.1f} MB): {output_path.name}"
+            )
             return output_path
-        reason = "URL changed" if cached_url and cached_url != url else "incomplete/unreadable or missing URL stamp"
+        if ok and cached_url == url and not quality_ok:
+            reason = (
+                f"quality too low ({width:.0f}x{height:.0f} @ {fps:.1f} fps; "
+                f"need ≥{MIN_ACCEPT_HEIGHT}p @ ≥{MIN_ACCEPT_FPS} fps)"
+            )
+        elif cached_url and cached_url != url:
+            reason = "URL changed"
+        else:
+            reason = "incomplete/unreadable or missing URL stamp"
         print(f"[DOWNLOAD] Replacing cache ({reason}): {output_path.name}")
         output_path.unlink(missing_ok=True)
         url_sidecar.unlink(missing_ok=True)
@@ -169,13 +204,16 @@ def download_video(url: str, output_path: Path) -> Path:
     if partial_path.exists():
         partial_path.unlink()
 
-    print(f"[DOWNLOAD] Downloading 1080p source → {output_path.name}")
+    print(
+        f"[DOWNLOAD] Downloading {TARGET_HEIGHT}p{TARGET_FPS} source → {output_path.name}"
+    )
 
-    # Prefer progressive/compatible streams; YouTube often 403s on some SABR/adaptive URLs.
+    # Verified on FRC uploads: format 299 = 1920x1080@60. Prefer that, then any ≥1000p≥50fps.
+    # Do NOT force player_client=web/ios/android — those hit YouTube SABR and only leave 360p.
     format_attempts = [
-        "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]",
-        "best[height<=1080][ext=mp4]/best[height<=720][ext=mp4]/best[height<=1080]/best",
-        "bv*[height<=720]+ba/b[height<=720]/b",
+        "bestvideo[height=1080][fps>=50]+bestaudio/bestvideo[height<=1080][fps>=50]+bestaudio/best",
+        "299+bestaudio/312+bestaudio/bestvideo[height=1080]+bestaudio/best",
+        "bv*[height>=1000]+ba/b[height>=1000]",
     ]
 
     base_opts: dict = {
@@ -189,9 +227,17 @@ def download_video(url: str, output_path: Path) -> Path:
         "fragment_retries": 10,
         "concurrent_fragment_downloads": 1,
         "progress_hooks": [_download_hook],
-        # Helps when googlevideo returns 403 on default web client
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "merge_output_format": "mp4",
+        "format_sort": ["res:1080", "fps", "codec:h264:m4a", "size"],
     }
+
+    # Optional override only — default yt-dlp clients (visionos + m3u8) expose 1080p60.
+    # export YTDLP_PLAYER_CLIENT=tv,mweb
+    player_client = os.environ.get("YTDLP_PLAYER_CLIENT", "").strip()
+    if player_client:
+        clients = [c.strip() for c in player_client.split(",") if c.strip()]
+        base_opts["extractor_args"] = {"youtube": {"player_client": clients}}
+        print(f"[DOWNLOAD] Using player_client override: {clients}")
 
     # YouTube may require a browser session for some IPs / accounts.
     # export YTDLP_BROWSER=chrome   (or safari / firefox)
@@ -207,35 +253,44 @@ def download_video(url: str, output_path: Path) -> Path:
         opts = dict(base_opts)
         opts["format"] = fmt
         try:
-            print(f"[DOWNLOAD] Attempt {idx}/{len(format_attempts)} format={fmt[:48]}…")
+            print(f"[DOWNLOAD] Attempt {idx}/{len(format_attempts)} format={fmt[:72]}…")
             with yt_dlp.YoutubeDL(opts) as ydl:  # type: ignore
                 ydl.download([url])
-            last_error = None
-            break
+            ok, width, height, fps, _frames = _probe_video(output_path)
+            if not ok:
+                raise RuntimeError(f"Downloaded file is not a readable video: {output_path}")
+            print(f"[DOWNLOAD] Got {width:.0f}x{height:.0f} @ {fps:.1f} fps")
+            if _meets_quality_target(height, fps):
+                last_error = None
+                break
+            last_error = RuntimeError(
+                f"Quality below target: {width:.0f}x{height:.0f} @ {fps:.1f} fps"
+            )
+            print(
+                f"[DOWNLOAD] Below target (≥{MIN_ACCEPT_HEIGHT}p @ ≥{MIN_ACCEPT_FPS} fps); "
+                "trying next format selector…"
+            )
         except yt_dlp.utils.DownloadError as error:
             last_error = error
             print(f"[DOWNLOAD] Attempt {idx} failed: {error}")
+        except RuntimeError as error:
+            last_error = error
+            print(f"[DOWNLOAD] Attempt {idx} failed: {error}")
 
-    if last_error is not None:
+    ok, width, height, fps, _frames = _probe_video(output_path) if output_path.exists() else (False, 0, 0, 0, 0)
+    if not ok or not _meets_quality_target(height, fps):
+        output_path.unlink(missing_ok=True)
+        url_sidecar.unlink(missing_ok=True)
         raise RuntimeError(
-            "YouTube download blocked (HTTP 403). Try:\n"
-            "  1) brew install ffmpeg\n"
-            "  2) export YTDLP_BROWSER=chrome   # then re-run\n"
-            "  3) pip install -U yt-dlp\n"
+            f"Refusing to run CV without ≥{MIN_ACCEPT_HEIGHT}p @ ≥{MIN_ACCEPT_FPS} fps "
+            f"(got {width:.0f}x{height:.0f} @ {fps:.1f}). "
+            "yt-dlp can usually fetch 1080p60 with default clients — do not force "
+            "player_client=web/android. Try: pip install -U yt-dlp && brew install ffmpeg. "
             f"Last error: {last_error}"
         ) from last_error
 
-    downloaded_video = cv2.VideoCapture(str(output_path))
-    is_readable = downloaded_video.isOpened() and downloaded_video.get(cv2.CAP_PROP_FRAME_COUNT) > 0
-    downloaded_video.release()
-    if not is_readable:
-        raise RuntimeError(
-            f"Downloaded file is not a readable video: {output_path}. "
-            "Install ffmpeg (brew install ffmpeg) and retry."
-        )
-
     url_sidecar.write_text(url.strip() + "\n", encoding="utf-8")
-    print(f"[DOWNLOAD] Ready: {output_path.name}")
+    print(f"[DOWNLOAD] Ready: {output_path.name} ({width:.0f}x{height:.0f} @ {fps:.1f} fps)")
     return output_path
 
 

@@ -1,4 +1,4 @@
-# Competition CV runbook (RobotDetector → Maneuver)
+# Competition CV runbook (RobotDetector → Hunter Eyes)
 
 Scouts never run YOLO. Analysis is laptop/batch after YouTube upload. CV lives in Dexie `cvMatchTelemetry` and never overwrites human scout paths.
 
@@ -10,7 +10,7 @@ Scouts never run YOLO. Analysis is laptop/batch after YouTube upload. CV lives i
 - TBA auth key in env (`TBA_AUTH_KEY` / `TBA_API_KEY` / `VITE_TBA_API_KEY`)
 - If YouTube returns HTTP 403: `export YTDLP_BROWSER=chrome` (or safari/firefox), then retry
 
-## 1. Deploy Maneuver + cloud CV API (Goal 1)
+## 1. Deploy Hunter Eyes + cloud CV API (Goal 1)
 
 1. Deploy the `web/` app to Netlify (GitHub or Netlify UI). Local `netlify-cli` may fail on Node 26 — use UI/Git if needed.
 2. In Netlify → Site settings → Environment variables, set:
@@ -56,7 +56,7 @@ python src/cv_event_watcher.py --event-key YOUR_EVENT --api-url "$CV_SYNC_API_UR
 
 ## 3. Scouts (tablets / phones)
 
-1. Open the deployed Maneuver URL (any network with internet — NL analysis → TR scouts is fine).
+1. Open the deployed Hunter Eyes URL (any network with internet — NL analysis → TR scouts is fine).
 2. Set the **same TBA event code** in the app.
 3. Wait for background sync (about every 60s) or open **Team Stats → CV → Sync now**.
 4. Per-team paths, zones, and heatmaps appear when that team’s matches are published.
@@ -79,7 +79,7 @@ Then re-run the watcher, or publish the bundle from `outputs/.../ai_scout_bundle
 
 - [ ] Netlify site live; `?action=health` OK
 - [ ] `CV_SYNC_API_KEY` set on Netlify **and** laptop
-- [ ] TBA key works (`event` matches Maneuver event code)
+- [ ] TBA key works (`event` matches Hunter Eyes event code)
 - [ ] `ffmpeg` + updated `yt-dlp` on laptop
 - [ ] Watcher running with correct `--event-key`
 - [ ] One test match published; scout tablet shows CV tab data

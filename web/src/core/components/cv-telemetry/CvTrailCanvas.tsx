@@ -1,5 +1,5 @@
 /**
- * Multi-layer CV trail on the Maneuver field (absolute blue-left coords).
+ * Multi-layer CV trail on the Hunter Eyes field (absolute blue-left coords).
  * Supports phase colors, multi-match overlays, and a simple time scrubber.
  */
 

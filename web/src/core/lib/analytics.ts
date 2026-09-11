@@ -51,7 +51,7 @@ class SimpleGA4 {
         // Enable basic tracking
         page_title: document.title,
         page_location: window.location.href,
-        app_name: 'Maneuver Scouting App',
+        app_name: 'Hunter Eyes Scouting App',
         app_version: '2025.1.0',
         debug_mode: process.env.NODE_ENV === 'development',
       });
@@ -93,7 +93,7 @@ class SimpleGA4 {
 
     try {
       window.gtag('event', eventName, {
-        app_name: 'Maneuver Scouting App',
+        app_name: 'Hunter Eyes Scouting App',
         app_version: '2025.1.0',
         ...parameters,
       });
