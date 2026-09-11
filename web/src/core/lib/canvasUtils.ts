@@ -822,20 +822,24 @@ function smoothOverlayPoints(
   points: Array<{ x: number; y: number; timeSec?: number }>,
   window = 5
 ): Array<{ x: number; y: number; timeSec?: number }> {
-  if (points.length < 3 || window < 2) return points;
+  const sorted =
+    points.length < 2
+      ? points
+      : [...points].sort((a, b) => (a.timeSec ?? 0) - (b.timeSec ?? 0));
+  if (sorted.length < 3 || window < 2) return sorted;
   const half = Math.floor(window / 2);
   const out: Array<{ x: number; y: number; timeSec?: number }> = [];
-  for (let i = 0; i < points.length; i += 1) {
+  for (let i = 0; i < sorted.length; i += 1) {
     let sx = 0;
     let sy = 0;
     let n = 0;
     for (let j = i - half; j <= i + half; j += 1) {
-      const p = points[Math.max(0, Math.min(points.length - 1, j))]!;
+      const p = sorted[Math.max(0, Math.min(sorted.length - 1, j))]!;
       sx += p.x;
       sy += p.y;
       n += 1;
     }
-    const src = points[i]!;
+    const src = sorted[i]!;
     out.push({ x: sx / n, y: sy / n, timeSec: src.timeSec });
   }
   return out;
@@ -868,10 +872,18 @@ export const drawCvTrailLayers = (
     });
     ctx.stroke();
 
+    // Start = open ring (earliest time); end = filled
     const start = points[0]!;
+    const end = points[points.length - 1]!;
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = trail.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(start.x * width, (1 - start.y) * height, 5, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.fillStyle = trail.color;
     ctx.beginPath();
-    ctx.arc(start.x * width, (1 - start.y) * height, 4, 0, Math.PI * 2);
+    ctx.arc(end.x * width, (1 - end.y) * height, 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }

@@ -26,22 +26,29 @@ export function cvNormToCanvas(
   };
 }
 
+/** Sort by match clock so start markers are not mid-path. */
+export function sortCvPointsByTime(points: CvFieldPoint[]): CvFieldPoint[] {
+  if (points.length < 2) return points;
+  return [...points].sort((a, b) => (a.timeSec ?? 0) - (b.timeSec ?? 0));
+}
+
 /** Light moving-average smoother for display (does not mutate source). */
 export function smoothCvPoints(points: CvFieldPoint[], window = 3): CvFieldPoint[] {
-  if (points.length < 3 || window < 2) return points;
+  const sorted = sortCvPointsByTime(points);
+  if (sorted.length < 3 || window < 2) return sorted;
   const half = Math.floor(window / 2);
   const out: CvFieldPoint[] = [];
-  for (let i = 0; i < points.length; i += 1) {
+  for (let i = 0; i < sorted.length; i += 1) {
     let sx = 0;
     let sy = 0;
     let n = 0;
     for (let j = i - half; j <= i + half; j += 1) {
-      const p = points[Math.max(0, Math.min(points.length - 1, j))]!;
+      const p = sorted[Math.max(0, Math.min(sorted.length - 1, j))]!;
       sx += p.x;
       sy += p.y;
       n += 1;
     }
-    const src = points[i]!;
+    const src = sorted[i]!;
     out.push({ x: sx / n, y: sy / n, timeSec: src.timeSec });
   }
   return out;

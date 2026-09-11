@@ -185,8 +185,8 @@ def render_dual_view_video(video_path: Path, telemetry_path: Path, output_path: 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
     out = cv2.VideoWriter(str(output_path), fourcc, fps, (output_w, output_h))
 
-    # Detect if the video is already trimmed (annotated video starts at frame 180 / 3.0s)
-    cover_end_frame = int(3.0 * fps)
+    // Detect if the video is already trimmed (legacy pipelines skipped a 3s cover)
+    cover_end_frame = int(0.0 * fps)
     
     # Check if telemetry frames start near cover_end_frame (e.g., ~180)
     all_telemetry_frames = [

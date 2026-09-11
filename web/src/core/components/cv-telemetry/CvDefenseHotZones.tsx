@@ -1,10 +1,9 @@
 /**
- * Proximity hot zones: where selected robots and opposing CV paths got close.
- * Density heatmap (not defense waypoints inside game objects).
+ * Proximity hot zones: where focus-alliance robots and opposing CV paths got close
+ * at the same time. Amber density = closeness; colored lines = opponent paths only.
  */
 
-import { useEffect, useMemo, useRef } from 'react';
-import fieldImage from '@/game-template/assets/2026-field.png';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CvFieldPoint, CvMatchTelemetryEntry } from '@/core/types/cv-telemetry';
 import {
   BLUE_ALLIANCE_HUES,
@@ -12,7 +11,9 @@ import {
   cvNormToCanvas,
   smoothCvPoints,
 } from '@/core/lib/cvFieldCoords';
+import { getFieldBackgroundImage } from '@/core/lib/cvFieldImage';
 import { cn } from '@/core/lib/utils';
+import { Button } from '@/core/components/ui/button';
 
 type CvDefenseHotZonesProps = {
   eventKey: string;
@@ -30,19 +31,22 @@ export function CvDefenseHotZones({
 }: CvDefenseHotZonesProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const { focusEntries, opponentEntries } = useMemo(() => {
+  const [focusAlliance, setFocusAlliance] = useState<'blue' | 'red'>(() => {
     const focusSet = new Set(selectedTeams);
     const focus = cvEntries.filter((e) => focusSet.has(e.teamNumber));
     const blues = focus.filter((e) => e.alliance === 'blue').length;
     const reds = focus.filter((e) => e.alliance === 'red').length;
-    const focusAlliance = blues >= reds ? 'blue' : 'red';
-    const oppAlliance = focusAlliance === 'blue' ? 'red' : 'blue';
+    return blues >= reds ? 'blue' : 'red';
+  });
+
+  const oppAlliance = focusAlliance === 'blue' ? 'red' : 'blue';
+
+  const { focusEntries, opponentEntries } = useMemo(() => {
     return {
-      focusEntries: focus.length > 0 ? focus : cvEntries.filter((e) => e.alliance === focusAlliance),
+      focusEntries: cvEntries.filter((e) => e.alliance === focusAlliance),
       opponentEntries: cvEntries.filter((e) => e.alliance === oppAlliance),
     };
-  }, [cvEntries, selectedTeams]);
+  }, [cvEntries, focusAlliance, oppAlliance]);
 
   const proximityPoints = useMemo(() => {
     const pts: Array<{ x: number; y: number }> = [];
@@ -56,7 +60,6 @@ export function CvDefenseHotZones({
       const path = e.matchPath && e.matchPath.length > 0 ? e.matchPath : e.teleopPath ?? e.autoPath;
       oppPts.push(...path);
     }
-    // Time-aligned proximity (~0.5s window) so heat marks real confrontations, not ghosts
     const TIME_WINDOW = 0.5;
     const stepF = Math.max(1, Math.floor(focusPts.length / 500));
     for (let i = 0; i < focusPts.length; i += stepF) {
@@ -94,13 +97,12 @@ export function CvDefenseHotZones({
     canvas.style.height = `${height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const img = new Image();
-    img.src = fieldImage;
-    img.onload = () => {
-      ctx.clearRect(0, 0, width, height);
+    let cancelled = false;
+    void getFieldBackgroundImage().then((img) => {
+      if (cancelled) return;
+      // Paint full frame in one shot (no intermediate black clear flash)
       ctx.drawImage(img, 0, 0, width, height);
 
-      // Proximity density (amber)
       if (proximityPoints.length > 0) {
         const cols = 72;
         const rows = 36;
@@ -134,15 +136,12 @@ export function CvDefenseHotZones({
         }
       }
 
-      // Faint smoothed opponent trails for context (distinct hues)
       opponentEntries.forEach((e, i) => {
         const raw = e.matchPath && e.matchPath.length > 0 ? e.matchPath : e.autoPath;
         const path = smoothCvPoints(raw, 5);
         if (path.length < 2) return;
-        const color =
-          e.alliance === 'red'
-            ? RED_ALLIANCE_HUES[i % RED_ALLIANCE_HUES.length]!
-            : BLUE_ALLIANCE_HUES[i % BLUE_ALLIANCE_HUES.length]!;
+        const hues = e.alliance === 'red' ? RED_ALLIANCE_HUES : BLUE_ALLIANCE_HUES;
+        const color = hues[i % hues.length]!;
         ctx.beginPath();
         ctx.strokeStyle = color;
         ctx.globalAlpha = 0.45;
@@ -155,6 +154,10 @@ export function CvDefenseHotZones({
         ctx.stroke();
         ctx.globalAlpha = 1;
       });
+    });
+
+    return () => {
+      cancelled = true;
     };
   }, [proximityPoints, opponentEntries]);
 
@@ -166,18 +169,54 @@ export function CvDefenseHotZones({
     );
   }
 
+  const focusLabels = focusEntries.map((e) => e.teamNumber).join(', ') || '—';
+  const oppHues = oppAlliance === 'red' ? RED_ALLIANCE_HUES : BLUE_ALLIANCE_HUES;
+
   return (
     <div className={cn('space-y-2', className)}>
-      <div className="text-sm font-medium">Proximity hot zones (alliances close)</div>
-      <p className="text-xs text-muted-foreground">
-        Amber = where selected robots and opposing CV paths were within ~1&nbsp;m. Opponent trails use
-        distinct colors for context — not defense marks inside field objects.
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-medium">Proximity hot zones</div>
+        <div className="flex gap-1">
+          <Button
+            type="button"
+            size="sm"
+            variant={focusAlliance === 'blue' ? 'default' : 'outline'}
+            className="h-7 px-2 text-xs"
+            onClick={() => setFocusAlliance('blue')}
+          >
+            Focus blue
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={focusAlliance === 'red' ? 'default' : 'outline'}
+            className="h-7 px-2 text-xs"
+            onClick={() => setFocusAlliance('red')}
+          >
+            Focus red
+          </Button>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        Amber = where {focusAlliance} ({focusLabels}) got within ~1&nbsp;m of {oppAlliance} at the same
+        time. Lines = opponent CV paths only.
       </p>
-      <div ref={containerRef} className="w-full overflow-hidden rounded-lg border">
+      <div ref={containerRef} className="w-full overflow-hidden rounded-lg border bg-muted/20">
         <canvas ref={canvasRef} className="block w-full" />
       </div>
+      <div className="flex flex-wrap gap-3 text-xs">
+        {opponentEntries.map((e, i) => (
+          <span key={e.id} className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full"
+              style={{ background: oppHues[i % oppHues.length] }}
+            />
+            Opponent {e.teamNumber}
+          </span>
+        ))}
+      </div>
       <div className="text-xs text-muted-foreground">
-        {proximityPoints.length} proximity samples · {opponentEntries.length} opponent trails
+        {proximityPoints.length} proximity samples · focus {focusAlliance}: {focusLabels}
       </div>
     </div>
   );

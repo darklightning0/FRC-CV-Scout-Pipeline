@@ -4,9 +4,9 @@
  */
 
 import { useEffect, useRef } from 'react';
-import fieldImage from '@/game-template/assets/2026-field.png';
 import { cn } from '@/core/lib/utils';
 import { cvNormToCanvas } from '@/core/lib/cvFieldCoords';
+import { getFieldBackgroundImage } from '@/core/lib/cvFieldImage';
 import type { CvFieldPoint } from '@/core/types/cv-telemetry';
 
 export type StackedHeatLayer = {
@@ -54,10 +54,9 @@ export function CvStackedHeatmapCanvas({
     canvas.style.height = `${height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const img = new Image();
-    img.src = fieldImage;
-    img.onload = () => {
-      ctx.clearRect(0, 0, width, height);
+    let cancelled = false;
+    void getFieldBackgroundImage().then((img) => {
+      if (cancelled) return;
       ctx.drawImage(img, 0, 0, width, height);
 
       const cols = 96;
@@ -95,6 +94,10 @@ export function CvStackedHeatmapCanvas({
           }
         }
       }
+    });
+
+    return () => {
+      cancelled = true;
     };
   }, [layers]);
 
@@ -104,7 +107,7 @@ export function CvStackedHeatmapCanvas({
   return (
     <div className={cn('space-y-2', className)}>
       {title && <div className="text-sm font-medium">{title}</div>}
-      <div ref={containerRef} className="w-full overflow-hidden rounded-lg border">
+      <div ref={containerRef} className="w-full overflow-hidden rounded-lg border bg-muted/20">
         <canvas ref={canvasRef} className="block w-full" />
       </div>
       <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">

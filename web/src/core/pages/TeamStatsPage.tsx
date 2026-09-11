@@ -14,6 +14,7 @@ import { DataAttribution } from "@/core/components/DataAttribution";
 import { TeamStatsFieldSettingsSheet, type TeamStatsFieldOption } from "@/core/components/team-stats/TeamStatsFieldSettingsSheet";
 // PitDataDisplay import removed (will use one from game-template)
 import { useTeamStats } from "@/core/hooks/useTeamStats";
+import { db } from "@/core/db/database";
 import type { TeamStats } from "@/types/game-interfaces";
 import type {
     StatSectionDefinition,
@@ -115,6 +116,7 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
     const [hiddenStatKeys, setHiddenStatKeys] = useState<Set<string>>(new Set());
     const [autoHideUncollected, setAutoHideUncollected] = useState(true);
     const [statsRefreshKey, setStatsRefreshKey] = useState(0);
+    const [cvMatchCount, setCvMatchCount] = useState(0);
     const teamStatsRequestIdRef = useRef(0);
     const compareStatsRequestIdRef = useRef(0);
 
@@ -219,6 +221,34 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
 
         return Array.from(optionsByKey.values());
     }, [statSections, rateSections]);
+
+    useEffect(() => {
+        let cancelled = false;
+        const loadCv = async () => {
+            const teamNum = Number.parseInt(selectedTeam, 10);
+            if (!Number.isFinite(teamNum) || teamNum <= 0) {
+                if (!cancelled) setCvMatchCount(0);
+                return;
+            }
+            try {
+                let rows = await db.cvMatchTelemetry.where('teamNumber').equals(teamNum).toArray();
+                if (selectedEventForChildren) {
+                    rows = rows.filter((r) => r.eventKey === selectedEventForChildren);
+                }
+                const keys = new Set(rows.map((r) => r.matchKey));
+                if (!cancelled) setCvMatchCount(keys.size);
+            } catch {
+                if (!cancelled) setCvMatchCount(0);
+            }
+        };
+        void loadCv();
+        const onImported = () => void loadCv();
+        window.addEventListener('cv-telemetry-imported', onImported);
+        return () => {
+            cancelled = true;
+            window.removeEventListener('cv-telemetry-imported', onImported);
+        };
+    }, [selectedTeam, selectedEventForChildren, statsRefreshKey]);
 
     useEffect(() => {
         const savedHiddenFields = localStorage.getItem("team_stats_hidden_fields");
@@ -486,10 +516,21 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
                                     <div className="flex flex-wrap gap-2">
                                         <div className="flex items-center gap-2">
                                             <Badge variant="outline" className="bg-muted/50">
-                                                {teamStats.matchesPlayed > 0 ? `${teamStats.matchesPlayed} matches` : 'No matches'}
+                                                {teamStats.matchesPlayed > 0
+                                                    ? `${teamStats.matchesPlayed} scouted`
+                                                    : '0 scouted'}
                                             </Badge>
+                                            {cvMatchCount > 0 && (
+                                                <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
+                                                    {cvMatchCount} CV
+                                                </Badge>
+                                            )}
                                             <Badge variant="default">
-                                                {teamStats.matchesPlayed > 0 ? `${teamStats.avgTotalPoints} avg pts` : 'Pit only'}
+                                                {teamStats.matchesPlayed > 0
+                                                    ? `${teamStats.avgTotalPoints} avg pts`
+                                                    : cvMatchCount > 0
+                                                      ? 'CV only — scout for scores'
+                                                      : 'Pit only'}
                                             </Badge>
                                         </div>
                                         {compareStats && (

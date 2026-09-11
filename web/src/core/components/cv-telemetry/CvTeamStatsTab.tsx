@@ -131,7 +131,10 @@ export function CvTeamStatsTab({
         if (!silent && result.importedMatches > 0) {
           toast.success(`CV API: ${result.importedMatches} match(es) synced`);
         }
-        await loadData();
+        // Only refresh UI when something new arrived — avoids heatmap/canvas blink
+        if (result.importedMatches > 0 || result.importedTeams > 0) {
+          await loadData();
+        }
       } catch {
         // Silent on background poll — network may be offline
       }
@@ -606,7 +609,8 @@ export function CvTeamStatsTab({
           <CardHeader className="p-0 pb-3">
             <CardTitle className="text-base">Position heatmap</CardTitle>
             <CardDescription>
-              Where this robot spent time in {currentCvEntry.matchKey} (from match video).
+              Pipeline PNG for {currentCvEntry.matchKey}: magenta→yellow = time spent (hottest =
+              yellow), cyan line = tracked path baked into the image — not the proximity overlay.
             </CardDescription>
           </CardHeader>
           <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-muted/30 aspect-2/1">
@@ -623,7 +627,11 @@ export function CvTeamStatsTab({
         <Card className="border bg-card/40 p-4">
           <CardHeader className="p-0 pb-3">
             <CardTitle className="text-base">All match heatmaps</CardTitle>
-            <CardDescription>Tap a match above to focus it; gallery of every synced match.</CardDescription>
+            <CardDescription>
+              Every match key already in this device’s CV sync for team {teamNumber} (from the
+              laptop/API). If you see <code className="text-xs">f1m1</code> here, that bundle was
+              published — it is not invented by this gallery.
+            </CardDescription>
           </CardHeader>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {cvEntries

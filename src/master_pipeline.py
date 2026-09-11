@@ -54,7 +54,9 @@ OUTPUT_VIDEO = OUTPUT_DIR / "annotated_last_run.mp4"
 # ---------------------------------------------------------------------------
 # VIDEO TIMING (seconds)
 # ---------------------------------------------------------------------------
-COVER_DURATION_SEC   = 3       # First 3 seconds are a cover/intro — skip
+# Livestream YT cuts usually start on-field already. Skipping 3s dropped real auto
+# departures (robots left the trench before the first exported waypoint).
+COVER_DURATION_SEC   = 0
 MATCH_END_SEC        = 180     # After 3 minutes the video shows results — stop
 RESULTS_SCREEN_SEC   = 200     # ~3:20 — the post-match results screen with team numbers
 
@@ -699,9 +701,11 @@ def smooth_and_filter_trajectory(
         smooth_y.append(sum(raw_y[start_idx:end_idx]) / (end_idx - start_idx))
 
     cleaned_records = []
+    cover_frames = int(COVER_DURATION_SEC * fps)
     for i in range(n):
         frame = records[i]["frame"]
-        time_sec = round(frame / fps, 2)
+        # Match clock starts at 0 when field processing starts (after optional cover)
+        time_sec = round(max(0.0, (frame - cover_frames) / fps), 2)
         
         # Calculate instantaneous speed over a 5-frame window centered at i
         w_start = max(0, i - 2)

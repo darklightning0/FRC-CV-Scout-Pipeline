@@ -130,7 +130,7 @@ def process_ai_telemetry(
             x = r.get("x_m", 0)
             y = r.get("y_m", 0)
             time_sec = float(r.get("time_sec", 0) or 0)
-            if x <= 0 or y <= 0:
+            if x < 0 or y < 0:
                 continue
 
             total_valid += 1
