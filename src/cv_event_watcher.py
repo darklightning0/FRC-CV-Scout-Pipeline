@@ -64,6 +64,92 @@ def youtube_url_for_match(match: dict[str, Any]) -> Optional[str]:
     return None
 
 
+# qm → eliminations → quarters → semis → finals (then set / match number)
+_COMP_LEVEL_ORDER = {
+    "qm": 0,
+    "ef": 1,
+    "qf": 2,
+    "sf": 3,
+    "f": 4,
+}
+
+
+def match_schedule_sort_key(match: dict[str, Any]) -> tuple:
+    """Chronological event order: Qual 1 first, then playoffs in bracket order."""
+    level = str(match.get("comp_level") or "").lower()
+    set_number = match.get("set_number")
+    match_number = match.get("match_number")
+    return (
+        _COMP_LEVEL_ORDER.get(level, 99),
+        int(set_number) if isinstance(set_number, (int, float)) else 0,
+        int(match_number) if isinstance(match_number, (int, float)) else 0,
+        str(match.get("key") or ""),
+    )
+
+
+def match_key_schedule_sort_key(match_key: str) -> tuple:
+    """Sort index rows the same way when only match_key is available."""
+    # e.g. 2026tuis2_qm12, 2026tuis2_qf1m2, 2026tuis2_sf1m1, 2026tuis2_f1m2
+    key = str(match_key or "")
+    suffix = key.split("_", 1)[-1].lower() if "_" in key else key.lower()
+    level = "qm"
+    set_number = 0
+    match_number = 0
+    if suffix.startswith("qm"):
+        level = "qm"
+        try:
+            match_number = int(suffix[2:])
+        except ValueError:
+            pass
+    elif suffix.startswith("ef"):
+        level = "ef"
+        # ef1m1 style
+        rest = suffix[2:]
+        if "m" in rest:
+            left, _, right = rest.partition("m")
+            try:
+                set_number = int(left or 0)
+                match_number = int(right or 0)
+            except ValueError:
+                pass
+    elif suffix.startswith("qf"):
+        level = "qf"
+        rest = suffix[2:]
+        if "m" in rest:
+            left, _, right = rest.partition("m")
+            try:
+                set_number = int(left or 0)
+                match_number = int(right or 0)
+            except ValueError:
+                pass
+    elif suffix.startswith("sf"):
+        level = "sf"
+        rest = suffix[2:]
+        if "m" in rest:
+            left, _, right = rest.partition("m")
+            try:
+                set_number = int(left or 0)
+                match_number = int(right or 0)
+            except ValueError:
+                pass
+    elif suffix.startswith("f"):
+        level = "f"
+        rest = suffix[1:]
+        if "m" in rest:
+            left, _, right = rest.partition("m")
+            try:
+                set_number = int(left or 0)
+                match_number = int(right or 0)
+            except ValueError:
+                pass
+    return (
+        _COMP_LEVEL_ORDER.get(level, 99),
+        set_number,
+        match_number,
+        key,
+    )
+
+
 def load_state(event_key: str) -> dict[str, Any]:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     path = STATE_DIR / f"{event_key}.json"
@@ -131,7 +217,7 @@ def publish_to_sync(event_key: str, match_key: str, artifact_dir: Path) -> Path:
             "bundle_path": f"{match_key}/ai_scout_bundle.json",
         }
     )
-    matches.sort(key=lambda m: m.get("match_key", ""))
+    matches.sort(key=lambda m: match_key_schedule_sort_key(str(m.get("match_key") or "")))
     index["event_key"] = event_key
     index["updated_at"] = datetime.now(timezone.utc).isoformat()
     index["matches"] = matches
@@ -228,6 +314,8 @@ def poll_once(
     api_key: str = "",
 ) -> int:
     matches = fetch_event_matches(event_key, auth_key)
+    # Always process in schedule order: qm1…qmN, then playoffs (qf/sf/f).
+    matches = sorted(matches, key=match_schedule_sort_key)
     queued = 0
     for match in matches:
         match_key = str(match.get("key") or "")
