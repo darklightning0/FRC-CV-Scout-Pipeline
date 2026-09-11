@@ -10,8 +10,8 @@
  *      Header: X-CV-Sync-Key: <CV_SYNC_API_KEY env on Netlify>
  */
 
-import type { Handler } from '@netlify/functions';
-import { getStore } from '@netlify/blobs';
+import type { Handler, HandlerEvent } from '@netlify/functions';
+import { connectLambda, getStore } from '@netlify/blobs';
 
 type IndexMatch = {
   match_key: string;
@@ -44,6 +44,26 @@ function getPublishKey(): string {
   return (process.env.CV_SYNC_API_KEY || '').trim();
 }
 
+/** Classic Functions (export handler) need connectLambda before getStore. */
+function getCvStore(event: HandlerEvent) {
+  connectLambda(event);
+
+  const siteID =
+    process.env.SITE_ID ||
+    process.env.NETLIFY_SITE_ID ||
+    '';
+  const token =
+    process.env.NETLIFY_BLOBS_TOKEN ||
+    process.env.NETLIFY_AUTH_TOKEN ||
+    '';
+
+  if (siteID && token) {
+    return getStore({ name: 'cv-telemetry', siteID, token });
+  }
+
+  return getStore('cv-telemetry');
+}
+
 export const handler: Handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
@@ -53,16 +73,17 @@ export const handler: Handler = async (event) => {
   const eventKey = (event.queryStringParameters?.event || '').trim().toLowerCase();
   const matchKey = (event.queryStringParameters?.match || '').trim();
 
-  try {
-    const store = getStore('cv-telemetry');
+  // Health must not depend on Blobs
+  if (event.httpMethod === 'GET' && (action === 'health' || !action)) {
+    return json(200, {
+      ok: true,
+      service: 'robotdetector-cv-api-netlify',
+      write_auth_required: Boolean(getPublishKey()),
+    });
+  }
 
-    if (event.httpMethod === 'GET' && (action === 'health' || !action)) {
-      return json(200, {
-        ok: true,
-        service: 'robotdetector-cv-api-netlify',
-        write_auth_required: Boolean(getPublishKey()),
-      });
-    }
+  try {
+    const store = getCvStore(event);
 
     if (event.httpMethod === 'GET' && action === 'index') {
       if (!eventKey) return json(400, { error: 'Missing event' });
