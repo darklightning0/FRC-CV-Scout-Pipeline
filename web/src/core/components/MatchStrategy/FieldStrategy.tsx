@@ -1,6 +1,6 @@
 /**
  * Field Strategy Component
- * 
+ *
  * Wrapper for FieldCanvas with phase tabs (Autonomous, Teleop, Endgame).
  * Needs fieldImagePath prop to be passed through to FieldCanvas.
  */
@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/core/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/animate-ui/radix/tabs";
 import FieldCanvas from "./FieldCanvas";
 import type { StrategyAutoRoutine, StrategyStageId, TeamStageSpots } from "@/core/hooks/useMatchStrategy";
+import type { CvOverlayTrail } from "@/core/lib/canvasUtils";
 
 interface TeamSlotSpotVisibility {
     showShooting: boolean;
@@ -16,12 +17,15 @@ interface TeamSlotSpotVisibility {
 }
 
 interface FieldStrategyProps {
-    fieldImagePath: string;  // Path to field image
+    fieldImagePath: string;
     activeTab: string;
-    selectedTeams?: (number | null)[];  // Optional: team numbers to display on canvas
+    selectedTeams?: (number | null)[];
     teamSlotSpotVisibility?: TeamSlotSpotVisibility[];
     getTeamSpots?: (teamNumber: number | null, stageId: StrategyStageId) => TeamStageSpots;
     selectedAutoRoutinesBySlot?: (StrategyAutoRoutine | null)[];
+    cvTrailLayers?: CvOverlayTrail[];
+    showCvTrails?: boolean;
+    onShowCvTrailsChange?: (show: boolean) => void;
     onTabChange: (value: string) => void;
 }
 
@@ -32,6 +36,9 @@ export const FieldStrategy = ({
     teamSlotSpotVisibility = [],
     getTeamSpots,
     selectedAutoRoutinesBySlot = [],
+    cvTrailLayers = [],
+    showCvTrails = false,
+    onShowCvTrailsChange,
     onTabChange
 }: FieldStrategyProps) => {
     return (
@@ -54,6 +61,9 @@ export const FieldStrategy = ({
                                 teamSlotSpotVisibility={teamSlotSpotVisibility}
                                 getTeamSpots={getTeamSpots}
                                 selectedAutoRoutinesBySlot={selectedAutoRoutinesBySlot}
+                                cvTrailLayers={cvTrailLayers}
+                                showCvTrails={showCvTrails}
+                                onShowCvTrailsChange={onShowCvTrailsChange}
                                 onStageChange={onTabChange}
                             />
                         </TabsContent>
@@ -67,6 +77,9 @@ export const FieldStrategy = ({
                                 teamSlotSpotVisibility={teamSlotSpotVisibility}
                                 getTeamSpots={getTeamSpots}
                                 selectedAutoRoutinesBySlot={selectedAutoRoutinesBySlot}
+                                cvTrailLayers={cvTrailLayers}
+                                showCvTrails={showCvTrails}
+                                onShowCvTrailsChange={onShowCvTrailsChange}
                                 onStageChange={onTabChange}
                             />
                         </TabsContent>
@@ -80,6 +93,9 @@ export const FieldStrategy = ({
                                 teamSlotSpotVisibility={teamSlotSpotVisibility}
                                 getTeamSpots={getTeamSpots}
                                 selectedAutoRoutinesBySlot={selectedAutoRoutinesBySlot}
+                                cvTrailLayers={cvTrailLayers}
+                                showCvTrails={showCvTrails}
+                                onShowCvTrailsChange={onShowCvTrailsChange}
                                 onStageChange={onTabChange}
                             />
                         </TabsContent>

@@ -12,16 +12,18 @@ import { TeamCardStats, TeamStatsDialog } from "@/game-template/pick-list-config
 import type { TeamStats } from "@/core/types/team-stats";
 import type { PickList } from "@/core/types/pickListTypes";
 import type { Alliance } from "@/core/lib/allianceTypes";
+import type { CvTeamPickMetrics } from "@/core/lib/cvPickListMetrics";
 
 interface TeamCardProps {
     team: TeamStats;
     pickLists: PickList[];
     alliances?: Alliance[];
+    cvMetrics?: CvTeamPickMetrics;
     onAddTeamToList: (team: TeamStats, listId: number) => void;
     onAddTeamToAlliance?: (teamNumber: number, allianceId: number) => void;
 }
 
-export const TeamCard = ({ team, pickLists, alliances, onAddTeamToList, onAddTeamToAlliance }: TeamCardProps) => {
+export const TeamCard = ({ team, pickLists, alliances, cvMetrics, onAddTeamToList, onAddTeamToAlliance }: TeamCardProps) => {
     const [selectValue, setSelectValue] = useState("none");
 
     // Check if a team is in a specific list
@@ -112,7 +114,7 @@ export const TeamCard = ({ team, pickLists, alliances, onAddTeamToList, onAddTea
             <div className="flex flex-col gap-2">
                 <div className="flex-1">
                     <div className="font-medium">Team {team.teamNumber}</div>
-                    <TeamCardStats team={team} />
+                    <TeamCardStats team={team} cvMetrics={cvMetrics} />
                     {getTeamLists().length > 0 && (
                         <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                             In lists: {getTeamLists().map(list => list.name).join(", ")}

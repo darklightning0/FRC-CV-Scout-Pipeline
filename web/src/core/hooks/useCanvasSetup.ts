@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { CANVAS_CONSTANTS } from "../lib/canvasConstants";
-import { drawSelectedAutoRoutines, drawTeamNumbersAndSpots } from "../lib/canvasUtils";
+import { drawSelectedAutoRoutines, drawTeamNumbersAndSpots, drawCvTrailLayers, type CvOverlayTrail } from "../lib/canvasUtils";
 import type { StrategyAutoRoutine, StrategyStageId, TeamStageSpots } from "@/core/hooks/useMatchStrategy";
 
 interface TeamSlotSpotVisibility {
@@ -34,6 +34,8 @@ interface UseCanvasSetupProps {
   selectedAutoRoutinesBySlot?: (StrategyAutoRoutine | null)[];
   isolatedAutoSlot?: number | null;
   autoReplayProgress?: number;
+  cvTrailLayers?: CvOverlayTrail[];
+  showCvTrails?: boolean;
   onCanvasReady?: () => void;
   onDimensionsChange?: (dimensions: { width: number; height: number }) => void;
 }
@@ -55,6 +57,8 @@ export const useCanvasSetup = ({
   selectedAutoRoutinesBySlot = [],
   isolatedAutoSlot = null,
   autoReplayProgress,
+  cvTrailLayers = [],
+  showCvTrails = false,
   onCanvasReady,
   onDimensionsChange
 }: UseCanvasSetupProps) => {
@@ -66,6 +70,8 @@ export const useCanvasSetup = ({
   const selectedAutoRoutinesBySlotRef = useRef(selectedAutoRoutinesBySlot);
   const isolatedAutoSlotRef = useRef(isolatedAutoSlot);
   const autoReplayProgressRef = useRef(autoReplayProgress);
+  const cvTrailLayersRef = useRef(cvTrailLayers);
+  const showCvTrailsRef = useRef(showCvTrails);
 
   useEffect(() => {
     selectedTeamsRef.current = selectedTeams;
@@ -90,6 +96,14 @@ export const useCanvasSetup = ({
   useEffect(() => {
     autoReplayProgressRef.current = autoReplayProgress;
   }, [autoReplayProgress]);
+
+  useEffect(() => {
+    cvTrailLayersRef.current = cvTrailLayers;
+  }, [cvTrailLayers]);
+
+  useEffect(() => {
+    showCvTrailsRef.current = showCvTrails;
+  }, [showCvTrails]);
 
   const redrawOverlay = useCallback(() => {
     const overlayCanvas = overlayCanvasRef.current;
@@ -118,6 +132,14 @@ export const useCanvasSetup = ({
       isolatedAutoSlotRef.current,
       autoReplayProgressRef.current,
     );
+    if (showCvTrailsRef.current && cvTrailLayersRef.current.length > 0) {
+      drawCvTrailLayers(
+        ctx,
+        overlayCanvas.width,
+        overlayCanvas.height,
+        cvTrailLayersRef.current,
+      );
+    }
   }, [overlayCanvasRef, currentStageId]);
 
   const setupCanvas = useCallback(() => {
@@ -237,7 +259,7 @@ export const useCanvasSetup = ({
   // Re-draw overlay when teams change
   useEffect(() => {
     redrawOverlay();
-  }, [selectedTeams, currentStageId, teamSlotSpotVisibility, getTeamSpots, selectedAutoRoutinesBySlot, isolatedAutoSlot, autoReplayProgress, redrawOverlay]);
+  }, [selectedTeams, currentStageId, teamSlotSpotVisibility, getTeamSpots, selectedAutoRoutinesBySlot, isolatedAutoSlot, autoReplayProgress, cvTrailLayers, showCvTrails, redrawOverlay]);
 
   useEffect(() => {
     setupCanvas();

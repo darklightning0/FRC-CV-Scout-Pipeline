@@ -86,9 +86,15 @@ export function teamTelemetryToEntry(
   const length = bundle.field_dimensions_m?.length ?? DEFAULT_FIELD_LENGTH_M;
   const width = bundle.field_dimensions_m?.width ?? DEFAULT_FIELD_WIDTH_M;
 
-  const autoPath = (team.auto_path_waypoints ?? [])
-    .map((wp) => waypointToNormalized(wp, length, width))
-    .filter((p): p is CvFieldPoint => p !== null);
+  const mapWaypoints = (list: AiScoutBundleWaypoint[] | undefined): CvFieldPoint[] =>
+    (list ?? [])
+      .map((wp) => waypointToNormalized(wp, length, width))
+      .filter((p): p is CvFieldPoint => p !== null);
+
+  const autoPath = mapWaypoints(team.auto_path_waypoints);
+  const teleopPath = mapWaypoints(team.teleop_path_waypoints);
+  const endgamePath = mapWaypoints(team.endgame_path_waypoints);
+  const matchPath = mapWaypoints(team.match_path_waypoints);
 
   let alliance = normalizeAlliance(team.alliance);
   if (alliance === 'unknown') {
@@ -117,6 +123,9 @@ export function teamTelemetryToEntry(
     trenchCrossings: team.trench_crossings ?? 0,
     bumpCrossings: team.bump_crossings ?? 0,
     autoPath,
+    teleopPath,
+    endgamePath,
+    matchPath: matchPath.length > 0 ? matchPath : undefined,
     sampleCount: team.sample_count ?? autoPath.length,
     schemaVersion: bundle.schema_version ?? 1,
     importedAt: Date.now(),

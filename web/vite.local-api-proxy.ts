@@ -6,6 +6,7 @@ type Provider = 'tba' | 'nexus' | 'statbotics';
 const TBA_BASE_URL = 'https://www.thebluealliance.com/api/v3';
 const NEXUS_BASE_URL = 'https://frc.nexus/api/v1';
 const STATBOTICS_BASE_URL = 'https://api.statbotics.io/v3';
+const STATBOTICS_FALLBACK_BASE_URL = 'https://api-statbotics.iterativerefinement.com/v3';
 
 const tbaAllowed = [
   /^\/events\/\d+(?:\/simple)?$/,
@@ -111,7 +112,9 @@ export function localApiProxyPlugin(mode: string): Plugin {
               ? TBA_BASE_URL
               : provider === 'nexus'
                 ? NEXUS_BASE_URL
-                : STATBOTICS_BASE_URL;
+                : env.STATBOTICS_API_BASE || STATBOTICS_BASE_URL;
+          const fallbackBase =
+            env.STATBOTICS_API_FALLBACK_BASE || STATBOTICS_FALLBACK_BASE_URL;
 
           const upstreamHeaders: Record<string, string> = {
             Accept: 'application/json',
@@ -124,12 +127,33 @@ export function localApiProxyPlugin(mode: string): Plugin {
                   : {}),
           };
 
-          const upstream = await fetch(`${baseUrl}${endpoint}`, {
-            method: 'GET',
-            headers: upstreamHeaders,
-          });
+          const fetchUpstream = async (base: string) => {
+            const upstream = await fetch(`${base}${endpoint}`, {
+              method: 'GET',
+              headers: upstreamHeaders,
+            });
+            const text = await upstream.text();
+            return { upstream, text };
+          };
 
-          const text = await upstream.text();
+          let { upstream, text } = await fetchUpstream(baseUrl);
+          if (
+            provider === 'statbotics' &&
+            fallbackBase &&
+            fallbackBase !== baseUrl &&
+            (upstream.status >= 500 || text.trim() === '{}' || text.trim() === '[]')
+          ) {
+            try {
+              const fallback = await fetchUpstream(fallbackBase);
+              if (fallback.upstream.ok && fallback.text.trim() !== '{}') {
+                upstream = fallback.upstream;
+                text = fallback.text;
+              }
+            } catch (fallbackError) {
+              console.warn('[local-api-proxy] Statbotics fallback failed', fallbackError);
+            }
+          }
+
           res.statusCode = upstream.status;
           res.end(text || JSON.stringify({}));
         } catch (error) {

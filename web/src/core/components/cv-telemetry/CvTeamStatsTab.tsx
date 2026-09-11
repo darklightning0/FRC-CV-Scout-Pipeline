@@ -26,6 +26,11 @@ import type { CvMatchTelemetryEntry } from '@/core/types/cv-telemetry';
 import type { PathWaypoint } from '@/game-template/components/field-map';
 import type { ScoutingEntryBase } from '@/types/scouting-entry';
 import { CvPathOverlay } from '@/core/components/cv-telemetry/CvPathOverlay';
+import {
+  CvTrailCanvas,
+  phaseLayersFromPaths,
+  type CvTrailLayer,
+} from '@/core/components/cv-telemetry/CvTrailCanvas';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/core/components/ui/card';
 import { Button } from '@/core/components/ui/button';
 import { Badge } from '@/core/components/ui/badge';
@@ -67,6 +72,7 @@ export function CvTeamStatsTab({
   const [selectedMatchKey, setSelectedMatchKey] = useState('');
   const [syncBaseUrl, setSyncBaseUrl] = useState(getStoredCvSyncBaseUrl);
   const [isPulling, setIsPulling] = useState(false);
+  const [pathScope, setPathScope] = useState<'match' | 'event'>('match');
 
   const eventForSync = selectedEvent || getCurrentEvent() || '';
 
@@ -169,6 +175,29 @@ export function CvTeamStatsTab({
       sampleCount: currentCvEntry.sampleCount,
     };
   }, [currentCvEntry]);
+
+  const phaseLayers = useMemo(() => {
+    if (!currentCvEntry) return [];
+    return phaseLayersFromPaths({
+      auto: currentCvEntry.autoPath,
+      teleop: currentCvEntry.teleopPath,
+      endgame: currentCvEntry.endgamePath,
+    });
+  }, [currentCvEntry]);
+
+  const eventTrailLayers = useMemo((): CvTrailLayer[] => {
+    const palette = ['#22d3ee', '#a78bfa', '#f59e0b', '#34d399', '#f472b6', '#60a5fa', '#fb7185'];
+    return cvEntries.map((entry, i) => ({
+      id: entry.matchKey,
+      label: entry.matchKey.replace(/^.*_/, ''),
+      color: palette[i % palette.length]!,
+      points:
+        entry.matchPath && entry.matchPath.length > 0
+          ? entry.matchPath
+          : entry.autoPath,
+      emphasis: entry.matchKey === currentCvEntry?.matchKey,
+    }));
+  }, [cvEntries, currentCvEntry?.matchKey]);
 
   const handlePullFromLaptop = async () => {
     if (!eventForSync) {
@@ -478,6 +507,57 @@ export function CvTeamStatsTab({
         </Card>
       )}
 
+      {currentCvEntry && (
+        <Card className="border bg-card/40 p-4 space-y-4">
+          <CardHeader className="p-0">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-base">CV trails & replay</CardTitle>
+                <CardDescription>
+                  Auto (0–18s) · Teleop (18–130s) · Endgame (130s+). Reprocess matches after the
+                  exporter update to fill teleop/endgame.
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={pathScope === 'match' ? 'default' : 'outline'}
+                  onClick={() => setPathScope('match')}
+                >
+                  This match
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={pathScope === 'event' ? 'default' : 'outline'}
+                  onClick={() => setPathScope('event')}
+                >
+                  All matches
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          {pathScope === 'match' ? (
+            phaseLayers.length > 0 ? (
+              <CvTrailCanvas
+                layers={phaseLayers}
+                enableReplay
+                title={`Phases — ${currentCvEntry.matchKey}`}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">No timed path points for this match yet.</p>
+            )
+          ) : (
+            <CvTrailCanvas
+              layers={eventTrailLayers}
+              enableReplay={false}
+              title={`All CV trails for team ${teamNumber}`}
+            />
+          )}
+        </Card>
+      )}
+
       {currentCvEntry?.heatmapDataUrl && (
         <Card className="border bg-card/40 p-4">
           <CardHeader className="p-0 pb-3">
@@ -486,11 +566,48 @@ export function CvTeamStatsTab({
               Where this robot spent time in {currentCvEntry.matchKey} (from match video).
             </CardDescription>
           </CardHeader>
-          <img
-            src={currentCvEntry.heatmapDataUrl}
-            alt={`CV heatmap for team ${teamNumber} in ${currentCvEntry.matchKey}`}
-            className="mx-auto max-h-[420px] w-full max-w-2xl rounded-md border object-contain bg-muted/30"
-          />
+          <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-muted/30 aspect-2/1">
+            <img
+              src={currentCvEntry.heatmapDataUrl}
+              alt={`CV heatmap for team ${teamNumber} in ${currentCvEntry.matchKey}`}
+              className="absolute inset-0 h-full w-full object-fill"
+            />
+          </div>
+        </Card>
+      )}
+
+      {cvEntries.some((e) => e.heatmapDataUrl) && (
+        <Card className="border bg-card/40 p-4">
+          <CardHeader className="p-0 pb-3">
+            <CardTitle className="text-base">All match heatmaps</CardTitle>
+            <CardDescription>Tap a match above to focus it; gallery of every synced match.</CardDescription>
+          </CardHeader>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {cvEntries
+              .filter((e) => e.heatmapDataUrl)
+              .map((e) => (
+                <button
+                  key={e.id}
+                  type="button"
+                  className={cn(
+                    'overflow-hidden rounded-lg border text-left transition',
+                    e.matchKey === selectedMatchKey
+                      ? 'border-cyan-500 ring-1 ring-cyan-500/40'
+                      : 'border-border hover:border-cyan-500/40'
+                  )}
+                  onClick={() => setSelectedMatchKey(e.matchKey)}
+                >
+                  <div className="aspect-2/1 bg-muted/30">
+                    <img
+                      src={e.heatmapDataUrl}
+                      alt={e.matchKey}
+                      className="h-full w-full object-fill"
+                    />
+                  </div>
+                  <div className="px-2 py-1.5 text-xs font-medium">{e.matchKey}</div>
+                </button>
+              ))}
+          </div>
         </Card>
       )}
     </div>

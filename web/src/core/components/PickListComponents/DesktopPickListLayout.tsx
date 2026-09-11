@@ -13,6 +13,7 @@ import type { TeamStats } from "@/core/types/team-stats";
 import type { PickList, PickListItem } from "@/core/types/pickListTypes";
 import type { PickListSortOption } from "@/game-template/pick-list-config";
 import type { Alliance, BackupTeam } from "@/core/lib/allianceTypes";
+import type { CvTeamPickMetrics } from "@/core/lib/cvPickListMetrics";
 
 type AlliancePosition = 'captain' | 'pick1' | 'pick2' | 'pick3';
 
@@ -24,6 +25,7 @@ interface DesktopPickListLayoutProps {
     backups: BackupTeam[];
     availableTeams: TeamStats[];
     teamLookupTeams: TeamStats[];
+    cvMetricsByTeam?: Map<number, CvTeamPickMetrics>;
     pickListEventTeamCount: number;
     newListName: string;
     newListDescription: string;
@@ -65,6 +67,7 @@ export const DesktopPickListLayout = ({
     backups,
     availableTeams,
     teamLookupTeams,
+    cvMetricsByTeam,
     pickListEventTeamCount,
     newListName,
     newListDescription,
@@ -107,6 +110,7 @@ export const DesktopPickListLayout = ({
                         totalTeams={pickListEventTeamCount}
                     pickLists={pickLists}
                     alliances={alliances}
+                    cvMetricsByTeam={cvMetricsByTeam}
                     searchFilter={searchFilter}
                     sortBy={sortBy}
                     activeFilterIds={activeFilterIds}

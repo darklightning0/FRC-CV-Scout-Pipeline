@@ -40,7 +40,8 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_VIDEO_URL = ""
 DEFAULT_MATCH_KEY = ""  # Required unless set via --match-key / watcher
 VIDEO_URL = DEFAULT_VIDEO_URL
-TEMP_VIDEO = PROJECT_ROOT / "outputs" / "temp_1080p_match.mp4"
+TEMP_VIDEO = PROJECT_ROOT / "outputs" / "temp_1080p_match.mp4"  # legacy fallback only
+
 OUTPUT_VIDEO = OUTPUT_DIR / "annotated_last_run.mp4"
 
 # ---------------------------------------------------------------------------
@@ -147,17 +148,22 @@ def download_video(url: str, output_path: Path) -> Path:
     import yt_dlp
     import yt_dlp.utils  # type: ignore
 
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    url_sidecar = Path(f"{output_path}.source_url")
+
     if output_path.exists():
+        cached_url = url_sidecar.read_text().strip() if url_sidecar.exists() else ""
         size_mb = output_path.stat().st_size / (1024 * 1024)
         cached_video = cv2.VideoCapture(str(output_path))
         is_readable = cached_video.isOpened() and cached_video.get(cv2.CAP_PROP_FRAME_COUNT) > 0
         cached_video.release()
-        if size_mb > 1.0 and is_readable:
+        if size_mb > 1.0 and is_readable and cached_url == url:
             print(f"[DOWNLOAD] Using cached video ({size_mb:.1f} MB): {output_path.name}")
             return output_path
-        else:
-            print("[DOWNLOAD] Cached file is incomplete; downloading again")
-            output_path.unlink()
+        reason = "URL changed" if cached_url and cached_url != url else "incomplete/unreadable or missing URL stamp"
+        print(f"[DOWNLOAD] Replacing cache ({reason}): {output_path.name}")
+        output_path.unlink(missing_ok=True)
+        url_sidecar.unlink(missing_ok=True)
 
     partial_path = Path(f"{output_path}.part")
     if partial_path.exists():
@@ -228,6 +234,7 @@ def download_video(url: str, output_path: Path) -> Path:
             "Install ffmpeg (brew install ffmpeg) and retry."
         )
 
+    url_sidecar.write_text(url.strip() + "\n", encoding="utf-8")
     print(f"[DOWNLOAD] Ready: {output_path.name}")
     return output_path
 
@@ -958,7 +965,11 @@ def main(argv: Optional[List[str]] = None):
     OUTPUT_VIDEO = video_out_dir / f"{MODEL_PATH.stem}_{now.strftime('%Y-%m-%d_%H-%M-%S')}.mp4"
     telemetry_path = artifact_dir / f"telemetry_{match_key}.json"
     bundle_path = artifact_dir / f"ai_scout_bundle_{match_key}.json"
-    source_video = Path(args.video) if args.video else TEMP_VIDEO
+    source_video = (
+        Path(args.video)
+        if args.video
+        else (artifact_dir / f"{match_key}_source.mp4")
+    )
     VIDEO_URL = args.url
 
     reporter = PipelineReporter()
@@ -1280,13 +1291,31 @@ def main(argv: Optional[List[str]] = None):
     if not args.skip_heatmaps:
         try:
             reporter.phase("Heatmaps")
-            from generate_heatmap import generate_team_heatmap, load_telemetry
+            from generate_heatmap import (
+                generate_alliance_heatmap,
+                generate_team_heatmap,
+                load_telemetry,
+            )
             import generate_heatmap as gh
             gh.OUTPUT_DIR = heatmap_dir
             tel = load_telemetry(Path(TELEMETRY_PATH))
             for team_id in tel.get("teams", {}).keys():
                 out_file = heatmap_dir / f"{MATCH_KEY}_team_{team_id}_heatmap.png"
                 generate_team_heatmap(tel, team_id, out_file)
+            blue_ids = [str(t) for t in tel.get("blue_teams", [])]
+            red_ids = [str(t) for t in tel.get("red_teams", [])]
+            if blue_ids:
+                generate_alliance_heatmap(
+                    tel,
+                    blue_ids,
+                    heatmap_dir / f"{MATCH_KEY}_team_alliance_blue_heatmap.png",
+                )
+            if red_ids:
+                generate_alliance_heatmap(
+                    tel,
+                    red_ids,
+                    heatmap_dir / f"{MATCH_KEY}_team_alliance_red_heatmap.png",
+                )
             reporter.event(f"Heatmaps → {heatmap_dir}")
         except Exception as e:
             reporter.warning(f"Heatmap generation failed: {e}")

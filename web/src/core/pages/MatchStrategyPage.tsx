@@ -20,7 +20,10 @@ import { FieldStrategy } from "@/core/components/MatchStrategy/FieldStrategy";
 import { TeamAnalysis } from "@/core/components/MatchStrategy/TeamAnalysis";
 import { clearAllStrategies, saveAllStrategyCanvases } from "@/core/lib/strategyCanvasUtils";
 import { useMatchStrategy } from "@/core/hooks/useMatchStrategy";
+import { useMatchCvTelemetry } from "@/core/hooks/useMatchCvTelemetry";
 import { matchStrategyDisplayModes, type MatchStrategyDisplayMode } from "@/game-template/match-strategy-config";
+import { MatchStrategyCvPanel } from "@/core/components/cv-telemetry/MatchStrategyCvPanel";
+import type { CvOverlayTrail } from "@/core/lib/canvasUtils";
 import defaultFieldImage from "@/game-template/assets/2026-field.png";
 
 // ============================================================================
@@ -135,6 +138,40 @@ const MatchStrategyPage = (props: MatchStrategyPageProps) => {
         [getSelectedAutoRoutineForSlot]
     );
 
+    const [showCvTrails, setShowCvTrails] = useState(true);
+    const { entries: cvEntries } = useMatchCvTelemetry(selectedEvent, matchNumber, selectedTeams);
+    const cvTrailLayers = useMemo((): CvOverlayTrail[] => {
+        const blueColors = ['#38bdf8', '#22d3ee', '#67e8f9'];
+        const redColors = ['#f87171', '#fb7185', '#f43f5e'];
+        let bi = 0;
+        let ri = 0;
+        return cvEntries.map((e) => {
+            const isBlue = e.alliance === 'blue';
+            const color = isBlue
+                ? blueColors[bi++ % blueColors.length]!
+                : redColors[ri++ % redColors.length]!;
+            const stagePoints =
+                activeTab === 'teleop'
+                    ? e.teleopPath && e.teleopPath.length > 0
+                        ? e.teleopPath
+                        : e.matchPath ?? e.autoPath
+                    : activeTab === 'endgame'
+                      ? e.endgamePath && e.endgamePath.length > 0
+                          ? e.endgamePath
+                          : e.matchPath ?? e.autoPath
+                      : e.autoPath.length > 0
+                        ? e.autoPath
+                        : e.matchPath ?? [];
+            return {
+                id: `cv-${e.teamNumber}`,
+                color,
+                points: stagePoints,
+                lineWidth: 2.4,
+                alpha: 0.8,
+            };
+        });
+    }, [cvEntries, activeTab]);
+
     const handleTeamChangeWithSpotDefaults = (index: number, teamNumber: number | null) => {
         handleTeamChange(index, teamNumber);
         setTeamSlotSpotVisibility((prev) => {
@@ -215,7 +252,17 @@ const MatchStrategyPage = (props: MatchStrategyPageProps) => {
                         teamSlotSpotVisibility={teamSlotSpotVisibility}
                         getTeamSpots={getTeamSpots}
                         selectedAutoRoutinesBySlot={selectedAutoRoutinesBySlot}
+                        cvTrailLayers={cvTrailLayers}
+                        showCvTrails={showCvTrails}
+                        onShowCvTrailsChange={setShowCvTrails}
                         onTabChange={setActiveTab}
+                    />
+
+                    <MatchStrategyCvPanel
+                        eventKey={selectedEvent}
+                        matchNumber={matchNumber}
+                        selectedTeams={selectedTeams}
+                        className="w-full"
                     />
 
                     <TeamAnalysis

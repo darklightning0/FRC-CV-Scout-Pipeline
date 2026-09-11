@@ -27,11 +27,10 @@ type CvPathOverlayProps = {
 function visualize(
   x: number,
   y: number,
-  alliance: CvAlliance
+  _alliance: CvAlliance
 ): { x: number; y: number } {
-  if (alliance === 'red') {
-    return { x: 1 - x, y: 1 - y };
-  }
+  // CV + scout overlay uses a fixed blue-left field image.
+  // Coords are absolute / blue-wall-at-0 — do NOT mirror for red (that put red starts on blue).
   return { x, y };
 }
 

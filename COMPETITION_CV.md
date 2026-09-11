@@ -86,6 +86,38 @@ Then re-run the watcher, or publish the bundle from `outputs/.../ai_scout_bundle
 - [ ] Heatmap visible for a team that played that match
 - [ ] Confirm scout auto/teleop paths unchanged after CV import
 
+### Clear local CV data before reprocessing
+
+```bash
+# Wipe all local CV artifacts + watcher state for an event (recommended after the shared-video bug)
+python scripts/clear_cv_event.py --event-key 2026tuis2
+
+# Or one match only
+python scripts/clear_cv_event.py --event-key 2026tuis2 --match-key 2026tuis2_qm12
+
+# Keep downloaded source videos, clear telemetry/heatmaps/state only
+python scripts/clear_cv_event.py --event-key 2026tuis2 --keep-videos
+```
+
+Also delete the legacy shared download if present: `rm -f outputs/temp_1080p_match.mp4`
+
+Tablets: Clear Data / event clear in the app if you need to wipe Dexie CV rows (or re-sync after republish).
+
+### Reprocess for phase paths + stacked alliance heatmaps
+
+After pulling the latest code:
+
+1. Stop the watcher (`Ctrl+C`).
+2. Clear local CV artifacts (keep videos if downloads are slow):
+   ```bash
+   python scripts/clear_cv_event.py --event-key 2026tuis2 --keep-videos
+   rm -f outputs/temp_1080p_match.mp4
+   ```
+3. Restart the watcher so each match re-exports `teleop_path_waypoints` / `endgame_path_waypoints` / `match_path_waypoints` and generates `*_team_alliance_{blue,red}_heatmap.png`.
+4. On tablets: Team Stats → CV → Sync now (or wait ~60s).
+
+New Match Strategy UI: enable **CV trails** on Field Strategy; stacked 3-color heatmaps + defense hot zones appear in the CV panel. Pick Lists can sort/filter by CV opponent zone % and crossings.
+
 ## 6. YouTube 403 mitigations
 
 1. `brew install ffmpeg` / ensure ffmpeg on PATH  

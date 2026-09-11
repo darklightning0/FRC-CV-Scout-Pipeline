@@ -22,6 +22,11 @@ export const sortOptions = [
             value: col.key,
             label: col.label
         })),
+    // CV metrics (Dexie cvMatchTelemetry aggregates)
+    { value: "cvRankScore", label: "CV Rank (opp zone + crossings)" },
+    { value: "cvOpponentZonePct", label: "CV Opponent Zone %" },
+    { value: "cvAllianceZonePct", label: "CV Alliance Zone %" },
+    { value: "cvTotalCrossings", label: "CV Crossings (trench+bump)" },
     // Match count always at the end
     { value: "matchCount", label: "Matches Played" },
 ];
@@ -45,6 +50,7 @@ export interface PickListFilterOption {
 
 export interface PickListFilterContext {
     defendedTeamNumber?: number | null;
+    cvMetricsByTeam?: Map<number, import("@/core/lib/cvPickListMetrics").CvTeamPickMetrics>;
 }
 
 export type PickListFilterGroupSelectionMode = "single" | "multi";
@@ -392,6 +398,30 @@ export const filterOptions: PickListFilterOption[] = [
             return (summary?.very || 0) > 0;
         },
     },
+
+    {
+        id: "cv-has-data",
+        label: "Has CV telemetry",
+        description: "Includes only teams with at least one synced CV match for this event.",
+        group: "CV",
+        predicate: (team, context) => (context?.cvMetricsByTeam?.get(team.teamNumber)?.matchCount ?? 0) > 0,
+    },
+    {
+        id: "cv-opponent-zone-20",
+        label: "CV opponent zone ≥ 20%",
+        description: "Average time in opponent zone from CV tracking.",
+        group: "CV",
+        predicate: (team, context) =>
+            (context?.cvMetricsByTeam?.get(team.teamNumber)?.avgOpponentZonePct ?? 0) >= 20,
+    },
+    {
+        id: "cv-crossings-1",
+        label: "CV crossings ≥ 1 avg",
+        description: "Average trench+bump crossings from CV tracking.",
+        group: "CV",
+        predicate: (team, context) =>
+            (context?.cvMetricsByTeam?.get(team.teamNumber)?.avgTotalCrossings ?? 0) >= 1,
+    },
 ];
 
 /**
@@ -402,10 +432,20 @@ export const filterOptions: PickListFilterOption[] = [
  * @param sortOption - The column key to sort by
  * @returns The numeric value to sort by
  */
-export function getSortValue(team: TeamStats, sortOption: PickListSortOption): number {
+export function getSortValue(
+    team: TeamStats,
+    sortOption: PickListSortOption,
+    cvMetricsByTeam?: Map<number, import("@/core/lib/cvPickListMetrics").CvTeamPickMetrics>,
+): number {
     if (sortOption === "teamNumber") {
         return team.teamNumber;
     }
+
+    const cv = cvMetricsByTeam?.get(team.teamNumber);
+    if (sortOption === "cvRankScore") return cv?.cvRankScore ?? 0;
+    if (sortOption === "cvOpponentZonePct") return cv?.avgOpponentZonePct ?? 0;
+    if (sortOption === "cvAllianceZonePct") return cv?.avgAllianceZonePct ?? 0;
+    if (sortOption === "cvTotalCrossings") return cv?.avgTotalCrossings ?? 0;
 
     // Handle nested paths like "auto.action1Count" or "endgame.option1"
     const parts = sortOption.split(".");

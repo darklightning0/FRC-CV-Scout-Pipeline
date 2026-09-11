@@ -35,6 +35,12 @@ export type CvMatchTelemetryEntry = {
   bumpCrossings: number;
   /** Auto path in normalized 0–1 blue perspective */
   autoPath: CvFieldPoint[];
+  /** Teleop segment (≈18s–130s) */
+  teleopPath?: CvFieldPoint[];
+  /** Endgame segment (≈130s+) */
+  endgamePath?: CvFieldPoint[];
+  /** Full-match sampled trail */
+  matchPath?: CvFieldPoint[];
   /** Optional data-URL or remote URL for team heatmap PNG */
   heatmapDataUrl?: string;
   sampleCount: number;
@@ -62,6 +68,9 @@ export type AiScoutTeamTelemetry = {
   trench_crossings?: number;
   bump_crossings?: number;
   auto_path_waypoints?: AiScoutBundleWaypoint[];
+  teleop_path_waypoints?: AiScoutBundleWaypoint[];
+  endgame_path_waypoints?: AiScoutBundleWaypoint[];
+  match_path_waypoints?: AiScoutBundleWaypoint[];
   sample_count?: number;
 };
 

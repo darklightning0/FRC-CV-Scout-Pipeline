@@ -115,13 +115,21 @@ def process_ai_telemetry(
 
         alliance_cnt = neutral_cnt = opponent_cnt = total_valid = 0
         auto_path = []
+        teleop_path = []
+        endgame_path = []
+        match_path = []
         trench_crossings = bump_crossings = 0
         prev_x = None
+
+        # Phase splits (seconds from match start) — FRC-style windows
+        AUTO_END = 18.0
+        TELEOP_END = 130.0  # ~2:10; remainder treated as endgame
+        SAMPLE_DT = 0.5
 
         for r in records:
             x = r.get("x_m", 0)
             y = r.get("y_m", 0)
-            time_sec = r.get("time_sec", 0)
+            time_sec = float(r.get("time_sec", 0) or 0)
             if x <= 0 or y <= 0:
                 continue
 
@@ -134,18 +142,25 @@ def process_ai_telemetry(
             else:
                 neutral_cnt += 1
 
-            # Auto path (sample every 0.5s during first 18s)
-            if time_sec <= 18.0 and (len(auto_path) == 0 or time_sec - auto_path[-1]["timeSec"] >= 0.5):
-                auto_path.append(
-                    {
-                        "x_m": round(x, 2),
-                        "y_m": round(y, 2),
-                        # Normalized 0–1 blue perspective (X: blue→red, Y: near→far)
-                        "x": round(x / field_length, 4),
-                        "y": round(y / field_width, 4),
-                        "timeSec": round(time_sec, 2),
-                    }
-                )
+            point = {
+                "x_m": round(x, 2),
+                "y_m": round(y, 2),
+                "x": round(x / field_length, 4),
+                "y": round(y / field_width, 4),
+                "timeSec": round(time_sec, 2),
+            }
+
+            def _append_sampled(bucket: list, pt: dict) -> None:
+                if len(bucket) == 0 or pt["timeSec"] - bucket[-1]["timeSec"] >= SAMPLE_DT:
+                    bucket.append(pt)
+
+            _append_sampled(match_path, point)
+            if time_sec <= AUTO_END:
+                _append_sampled(auto_path, point)
+            elif time_sec <= TELEOP_END:
+                _append_sampled(teleop_path, point)
+            else:
+                _append_sampled(endgame_path, point)
 
             if prev_x is not None:
                 crossed = (prev_x < BLUE_ALLIANCE_X_MAX <= x) or (x < BLUE_ALLIANCE_X_MAX <= prev_x) or (
@@ -174,6 +189,9 @@ def process_ai_telemetry(
             "trench_crossings": trench_crossings,
             "bump_crossings": bump_crossings,
             "auto_path_waypoints": auto_path,
+            "teleop_path_waypoints": teleop_path,
+            "endgame_path_waypoints": endgame_path,
+            "match_path_waypoints": match_path,
             "sample_count": total_valid,
         }
 

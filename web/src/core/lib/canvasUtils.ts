@@ -808,3 +808,46 @@ export const restoreBackgroundWithOverlays = (
     // Draw overlays on full canvas (no clipping) to avoid artifacts
     drawTeamNumbers(ctx, width, height, selectedTeams);
 };
+
+/** Absolute blue-left CV trails (no alliance mirroring — same space as CvTrailCanvas). */
+export type CvOverlayTrail = {
+  id: string;
+  color: string;
+  points: Array<{ x: number; y: number }>;
+  lineWidth?: number;
+  alpha?: number;
+};
+
+export const drawCvTrailLayers = (
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  trails: CvOverlayTrail[],
+) => {
+  if (!trails.length) return;
+
+  for (const trail of trails) {
+    if (trail.points.length < 2) continue;
+    ctx.save();
+    ctx.globalAlpha = trail.alpha ?? 0.85;
+    ctx.strokeStyle = trail.color;
+    ctx.lineWidth = trail.lineWidth ?? 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    trail.points.forEach((point, index) => {
+      const px = point.x * width;
+      const py = point.y * height;
+      if (index === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+
+    const start = trail.points[0]!;
+    ctx.fillStyle = trail.color;
+    ctx.beginPath();
+    ctx.arc(start.x * width, start.y * height, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+};

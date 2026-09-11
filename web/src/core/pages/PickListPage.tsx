@@ -30,6 +30,7 @@ const PickListPage = () => {
         showAllianceSelection,
         hideAllianceAssignedTeams,
         filteredAndSortedTeams,
+        cvMetricsByTeam,
 
         // State setters
         setNewListName,
@@ -86,6 +87,7 @@ const PickListPage = () => {
                     backups={backups}
                     availableTeams={availableTeams}
                     teamLookupTeams={teamLookupTeams}
+                    cvMetricsByTeam={cvMetricsByTeam}
                     pickListEventTeamCount={pickListEventTeamCount}
                     newListName={newListName}
                     newListDescription={newListDescription}
@@ -132,6 +134,7 @@ const PickListPage = () => {
                     backups={backups}
                     availableTeams={availableTeams}
                     teamLookupTeams={teamLookupTeams}
+                    cvMetricsByTeam={cvMetricsByTeam}
                     pickListEventTeamCount={pickListEventTeamCount}
                     newListName={newListName}
                     newListDescription={newListDescription}

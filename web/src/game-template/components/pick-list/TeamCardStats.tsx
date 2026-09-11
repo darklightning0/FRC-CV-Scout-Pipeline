@@ -6,16 +6,18 @@
  */
 
 import type { TeamStats } from '@/core/types/team-stats';
+import type { CvTeamPickMetrics } from '@/core/lib/cvPickListMetrics';
 
 interface TeamCardStatsProps {
     team: TeamStats;
+    cvMetrics?: CvTeamPickMetrics;
 }
 
 /**
  * Inline stats display for team cards.
  * Dynamically renders action averages from team stats.
  */
-export const TeamCardStats = ({ team }: TeamCardStatsProps) => {
+export const TeamCardStats = ({ team, cvMetrics }: TeamCardStatsProps) => {
     const auto = team.auto as Record<string, unknown> | undefined;
     const teleop = team.teleop as Record<string, unknown> | undefined;
     const endgame = team.endgame;
@@ -42,6 +44,12 @@ export const TeamCardStats = ({ team }: TeamCardStatsProps) => {
             <div className="text-xs text-muted-foreground">
                 {endgame?.climbRate || 0}% climb • {team.matchCount || 0} matches
             </div>
+            {cvMetrics && cvMetrics.matchCount > 0 && (
+                <div className="text-xs text-muted-foreground">
+                    CV: opp {cvMetrics.avgOpponentZonePct.toFixed(0)}% · xings{' '}
+                    {cvMetrics.avgTotalCrossings.toFixed(1)} · rank {cvMetrics.cvRankScore.toFixed(0)}
+                </div>
+            )}
         </>
     );
 };

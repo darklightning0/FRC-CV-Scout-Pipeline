@@ -4,7 +4,13 @@ type Provider = 'tba' | 'nexus' | 'statbotics';
 
 const TBA_BASE_URL = 'https://www.thebluealliance.com/api/v3';
 const NEXUS_BASE_URL = 'https://frc.nexus/api/v1';
-const STATBOTICS_BASE_URL = 'https://api.statbotics.io/v3';
+/** Official Statbotics API is often 500 right now; mirror holds the same v3 data. */
+const STATBOTICS_BASE_URL =
+  (process.env.STATBOTICS_API_BASE || 'https://api.statbotics.io/v3').replace(/\/$/, '');
+const STATBOTICS_FALLBACK_BASE_URL = (
+  process.env.STATBOTICS_API_FALLBACK_BASE ||
+  'https://api-statbotics.iterativerefinement.com/v3'
+).replace(/\/$/, '');
 
 const tbaAllowed = [
   /^\/events\/\d+(?:\/simple)?$/,
@@ -105,12 +111,35 @@ export const handler: Handler = async (event) => {
             : {}),
     };
 
-    const upstreamResponse = await fetch(`${baseUrl}${endpoint}`, {
-      method: 'GET',
-      headers: upstreamHeaders,
-    });
+    const fetchUpstream = async (base: string) => {
+      const upstreamResponse = await fetch(`${base}${endpoint}`, {
+        method: 'GET',
+        headers: upstreamHeaders,
+      });
+      const text = await upstreamResponse.text();
+      return { upstreamResponse, text };
+    };
 
-    const text = await upstreamResponse.text();
+    let { upstreamResponse, text } = await fetchUpstream(baseUrl);
+
+    // Official Statbotics frequently returns 500/`{}` while the website still works.
+    if (
+      provider === 'statbotics' &&
+      STATBOTICS_FALLBACK_BASE_URL &&
+      STATBOTICS_FALLBACK_BASE_URL !== baseUrl &&
+      (upstreamResponse.status >= 500 || text.trim() === '{}' || text.trim() === '[]')
+    ) {
+      try {
+        const fallback = await fetchUpstream(STATBOTICS_FALLBACK_BASE_URL);
+        if (fallback.upstreamResponse.ok && fallback.text.trim() !== '{}') {
+          upstreamResponse = fallback.upstreamResponse;
+          text = fallback.text;
+        }
+      } catch (fallbackError) {
+        console.warn('[api-proxy] Statbotics fallback failed', fallbackError);
+      }
+    }
+
     const upstreamCacheControl = upstreamResponse.headers.get('cache-control');
 
     return {

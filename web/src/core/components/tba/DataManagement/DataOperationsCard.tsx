@@ -28,6 +28,7 @@ interface DataOperationsCardProps {
   eventTeamsLoading: boolean;
   pitDataLoading: boolean;
   debugNexusLoading: boolean;
+  regionalDownloadLoading?: boolean;
   onLoadMatchData: () => void;
   onLoadMatchResults: () => void;
   onLoadValidationData: () => void;
@@ -35,6 +36,7 @@ interface DataOperationsCardProps {
   onLoadEventTeams: () => void;
   onLoadPitData: () => void;
   onDebugNexus: () => void;
+  onDownloadRegionalData?: () => void;
 }
 
 export const DataOperationsCard: React.FC<DataOperationsCardProps> = ({
@@ -49,6 +51,7 @@ export const DataOperationsCard: React.FC<DataOperationsCardProps> = ({
   eventTeamsLoading,
   pitDataLoading,
   debugNexusLoading,
+  regionalDownloadLoading = false,
   onLoadMatchData,
   onLoadMatchResults,
   onLoadValidationData,
@@ -56,8 +59,18 @@ export const DataOperationsCard: React.FC<DataOperationsCardProps> = ({
   onLoadEventTeams,
   onLoadPitData,
   onDebugNexus,
+  onDownloadRegionalData,
 }) => {
   const useServerProxy = true;
+  const anyLoading =
+    matchDataLoading ||
+    matchResultsLoading ||
+    validationLoading ||
+    statboticsLoading ||
+    eventTeamsLoading ||
+    pitDataLoading ||
+    debugNexusLoading ||
+    regionalDownloadLoading;
 
   const getDataTypeInfo = () => {
     switch (dataType) {
@@ -324,6 +337,34 @@ export const DataOperationsCard: React.FC<DataOperationsCardProps> = ({
               Missing required information: {missingRequirements.join(', ')}
             </AlertDescription>
           </Alert>
+        )}
+
+        {onDownloadRegionalData && (
+          <div className="space-y-2 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3">
+            <p className="text-sm font-medium">Download entire regional</p>
+            <p className="text-xs text-muted-foreground">
+              One click: match schedules, teams, results, validation/COPR, Statbotics EPA (if
+              available), and Nexus pits. Individual loaders below still work for refresh.
+            </p>
+            <Button
+              className="w-full h-12"
+              variant="default"
+              onClick={onDownloadRegionalData}
+              disabled={anyLoading || !eventKey.trim()}
+            >
+              {regionalDownloadLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Downloading regional data…
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download regional data
+                </>
+              )}
+            </Button>
+          </div>
         )}
 
         {/* Load Button */}

@@ -80,6 +80,7 @@ const APIDataPage: React.FC = () => {
   const [statboticsRefreshKey, setStatboticsRefreshKey] = useState(0);
   const [statboticsLoading, setStatboticsLoading] = useState(false);
   const [dataStatusRefreshKey, setDataStatusRefreshKey] = useState(0);
+  const [regionalDownloadLoading, setRegionalDownloadLoading] = useState(false);
   const [correctingClimbData, setCorrectingClimbData] = useState(false);
   const [previewingClimbCorrections, setPreviewingClimbCorrections] = useState(false);
   const [climbCorrectionPreview, setClimbCorrectionPreview] = useState<ClimbCorrectionPreview | null>(null);
@@ -243,7 +244,9 @@ const APIDataPage: React.FC = () => {
           toast.info(`Fetching Statbotics EPA for ${eventTeams.length} teams — this can take several minutes…`);
           const metrics = await fetchAndCacheEventStatboticsEPA(eventKey, eventTeams);
           if (metrics.size === 0) {
-            toast.warning('Statbotics EPA finished with 0 teams cached (API/proxy may have failed)');
+            toast.warning(
+              'Statbotics has no EPA for this event yet (common early season). Match/CV data still works.'
+            );
           } else {
             toast.success(`Cached Statbotics EPA for ${metrics.size} teams`);
           }
@@ -288,7 +291,9 @@ const APIDataPage: React.FC = () => {
         bumpDataStatus();
 
         if (metrics.size === 0) {
-          toast.error('Statbotics returned no EPA data (check proxy / Statbotics availability)');
+          toast.error(
+            'Statbotics has no EPA for this event yet (upstream 500/empty). TBA still works; try EPA later in the season.'
+          );
         } else {
           toast.success(`Loaded Statbotics EPA for ${metrics.size} of ${eventTeams.length} teams`);
         }
@@ -312,6 +317,95 @@ const APIDataPage: React.FC = () => {
     }
 
     await loadEventTeams(apiKey, eventKey, false, () => { });
+  };
+
+  /** One-click: schedules → teams → results → validation/COPR/EPA → Nexus pits (soft-fail). */
+  const handleDownloadRegionalData = async () => {
+    if (!eventKey.trim()) {
+      toast.error('Please enter an event key first');
+      return;
+    }
+
+    executeWithConfirmation(async () => {
+      setRegionalDownloadLoading(true);
+      const key = eventKey.trim();
+      const steps: string[] = [];
+      try {
+        toast.info(`Downloading regional data for ${key}…`);
+
+        await fetchMatchDataFromTBA(apiKey, key, false, () => { });
+        steps.push('schedules');
+
+        await loadEventTeams(apiKey, key, false, () => { });
+        steps.push('teams');
+
+        await loadMatchResults(apiKey, key, false, () => { });
+        try {
+          await fetchValidationMatches(key, apiKey, false);
+        } catch (e) {
+          console.warn('[Regional] detailed TBA cache', e);
+        }
+        steps.push('results');
+
+        const validationData = await fetchValidationMatches(key, apiKey, false);
+        try {
+          await fetchAndCacheEventCOPRs(key, apiKey);
+          steps.push('COPR');
+        } catch (e) {
+          console.warn('[Regional] COPR', e);
+        }
+
+        try {
+          let eventTeams = await fetchEventTeamNumbersFromTBA(key, apiKey);
+          if (eventTeams.length === 0) {
+            eventTeams = extractTeamsFromMatches(validationData);
+          }
+          if (eventTeams.length > 0) {
+            const metrics = await fetchAndCacheEventStatboticsEPA(key, eventTeams);
+            if (metrics.size > 0) {
+              steps.push(`EPA(${metrics.size})`);
+            } else {
+              steps.push('EPA(none yet)');
+            }
+          }
+        } catch (e) {
+          console.warn('[Regional] Statbotics EPA', e);
+          steps.push('EPA(skipped)');
+        }
+
+        try {
+          const storedData = getStoredPitData(key);
+          if (storedData.addresses || storedData.map) {
+            setPitData(storedData);
+            steps.push('pits(cache)');
+          } else {
+            const fetchedData = await getNexusPitData(key, nexusApiKey);
+            setPitData(fetchedData);
+            storePitData(key, fetchedData.addresses, fetchedData.map);
+            if (fetchedData.addresses && Object.keys(fetchedData.addresses).length > 0) {
+              extractAndStoreTeamsFromPitAddresses(key, fetchedData.addresses);
+            }
+            steps.push('pits');
+          }
+        } catch (e) {
+          console.warn('[Regional] Nexus pits', e);
+          steps.push('pits(skipped)');
+        }
+
+        setCurrentEvent(key);
+        setStoredDataExists(hasStoredEventData(key));
+        bumpDataStatus();
+        toast.success(`Regional data ready: ${steps.join(' → ')}`);
+      } catch (error) {
+        console.error('[Regional] download failed', error);
+        toast.error(
+          `Regional download stopped after: ${steps.join(' → ') || 'start'}. Check TBA key / network.`
+        );
+      } finally {
+        setRegionalDownloadLoading(false);
+        bumpDataStatus();
+      }
+    });
   };
 
   const handleLoadPitData = async () => {
@@ -582,6 +676,7 @@ const APIDataPage: React.FC = () => {
         eventTeamsLoading={eventTeamsLoading}
         pitDataLoading={pitDataLoading}
         debugNexusLoading={debugNexusLoading}
+        regionalDownloadLoading={regionalDownloadLoading}
         onLoadMatchData={handleLoadMatchData}
         onLoadMatchResults={handleLoadMatchResults}
         onLoadValidationData={handleLoadValidationData}
@@ -589,6 +684,7 @@ const APIDataPage: React.FC = () => {
         onLoadEventTeams={handleLoadEventTeams}
         onLoadPitData={handleLoadPitData}
         onDebugNexus={handleDebugNexus}
+        onDownloadRegionalData={handleDownloadRegionalData}
       />
 
       {/* Match Data Loader */}

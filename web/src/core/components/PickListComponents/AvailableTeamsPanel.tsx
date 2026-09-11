@@ -33,12 +33,14 @@ import type { PickList } from "@/core/types/pickListTypes";
 import type { PickListSortOption } from "@/game-template/pick-list-config";
 import { filterGroupSelectionModes, filterOptions } from "@/game-template/pick-list-config";
 import type { Alliance } from "@/core/lib/allianceTypes";
+import type { CvTeamPickMetrics } from "@/core/lib/cvPickListMetrics";
 
 interface AvailableTeamsPanelProps {
     teams: TeamStats[];
     totalTeams: number;
     pickLists: PickList[];
     alliances?: Alliance[];
+    cvMetricsByTeam?: Map<number, CvTeamPickMetrics>;
     searchFilter: string;
     sortBy: PickListSortOption;
     activeFilterIds: string[];
@@ -61,6 +63,7 @@ export const AvailableTeamsPanel = ({
     totalTeams,
     pickLists,
     alliances,
+    cvMetricsByTeam,
     searchFilter,
     sortBy,
     activeFilterIds,
@@ -301,6 +304,7 @@ export const AvailableTeamsPanel = ({
                         team={team}
                         pickLists={pickLists}
                         alliances={alliances}
+                        cvMetrics={cvMetricsByTeam?.get(team.teamNumber)}
                         onAddTeamToList={onAddTeamToList}
                         onAddTeamToAlliance={onAddTeamToAlliance}
                     />

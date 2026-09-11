@@ -87,11 +87,21 @@ export async function proxyGetJson<T>(
         if (directRes.ok) return await directRes.json() as T;
       } catch {}
     } else if (provider === 'statbotics') {
-      const directUrl = `https://api.statbotics.io/v3${endpoint}`;
-      try {
-        const directRes = await fetch(directUrl);
-        if (directRes.ok) return await directRes.json() as T;
-      } catch {}
+      const bases = [
+        'https://api.statbotics.io/v3',
+        'https://api-statbotics.iterativerefinement.com/v3',
+      ];
+      for (const base of bases) {
+        try {
+          const directRes = await fetch(`${base}${endpoint}`);
+          if (!directRes.ok) continue;
+          const text = await directRes.text();
+          if (text.trim() === '{}' || text.trim() === '[]') continue;
+          return JSON.parse(text) as T;
+        } catch {
+          /* try next base */
+        }
+      }
     }
 
     throw error;

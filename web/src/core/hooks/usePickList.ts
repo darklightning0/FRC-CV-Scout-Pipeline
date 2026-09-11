@@ -31,6 +31,10 @@ import {
 } from "@/game-template/pick-list-config";
 import type { Alliance, BackupTeam } from "@/core/lib/allianceTypes";
 import type { TeamStats } from "@/core/types/team-stats";
+import {
+    loadCvPickMetricsForEvent,
+    type CvTeamPickMetrics,
+} from "@/core/lib/cvPickListMetrics";
 
 type AlliancePosition = 'captain' | 'pick1' | 'pick2' | 'pick3';
 
@@ -40,6 +44,7 @@ export interface UsePickListResult {
     teamLookupTeams: TeamStats[];
     pickListEventTeamCount: number;
     filteredAndSortedTeams: TeamStats[];
+    cvMetricsByTeam: Map<number, CvTeamPickMetrics>;
     pickLists: PickList[];
     alliances: Alliance[];
     backups: BackupTeam[];
@@ -228,6 +233,31 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
     const [hideAllianceAssignedTeams, setHideAllianceAssignedTeams] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
     const [teamMembershipSnapshots, setTeamMembershipSnapshots] = useState<TeamMembershipSnapshots>({});
+    const [cvMetricsByTeam, setCvMetricsByTeam] = useState<Map<number, CvTeamPickMetrics>>(
+        () => new Map()
+    );
+
+    useEffect(() => {
+        let cancelled = false;
+        const eventForCv = (pickListEvent || normalizedEventKey || "").trim();
+        if (!eventForCv) {
+            setCvMetricsByTeam(new Map());
+            return;
+        }
+        void loadCvPickMetricsForEvent(eventForCv).then((metrics) => {
+            if (!cancelled) setCvMetricsByTeam(metrics);
+        });
+        const onImported = () => {
+            void loadCvPickMetricsForEvent(eventForCv).then((metrics) => {
+                if (!cancelled) setCvMetricsByTeam(metrics);
+            });
+        };
+        window.addEventListener("cv-telemetry-imported", onImported);
+        return () => {
+            cancelled = true;
+            window.removeEventListener("cv-telemetry-imported", onImported);
+        };
+    }, [pickListEvent, normalizedEventKey]);
 
     // Load pick lists from localStorage
     useEffect(() => {
@@ -339,7 +369,11 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
 
 
     // Sort teams based on selected criteria using configurable sort functions
-    const sortTeams = useCallback((teams: TeamStats[], sort: PickListSortOption): TeamStats[] => {
+    const sortTeams = useCallback((
+        teams: TeamStats[],
+        sort: PickListSortOption,
+        cvMetrics: Map<number, CvTeamPickMetrics>,
+    ): TeamStats[] => {
         const ascending = isAscendingSort(sort);
 
         return [...teams].sort((a, b) => {
@@ -352,8 +386,8 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
                 }
             }
 
-            const aValue = getSortValue(a, sort);
-            const bValue = getSortValue(b, sort);
+            const aValue = getSortValue(a, sort, cvMetrics);
+            const bValue = getSortValue(b, sort, cvMetrics);
 
             return ascending ? aValue - bValue : bValue - aValue;
         });
@@ -445,6 +479,7 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
                 Number.isFinite(parsedDefenseTarget) && parsedDefenseTarget > 0
                     ? parsedDefenseTarget
                     : null,
+            cvMetricsByTeam,
         };
 
         const filtered = filterTeams(availableTeams, searchFilter)
@@ -466,7 +501,7 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
                 return !allianceAssignedTeams.has(team.teamNumber);
             });
 
-        return sortTeams(filtered, sortBy);
+        return sortTeams(filtered, sortBy, cvMetricsByTeam);
     }, [
         availableTeams,
         searchFilter,
@@ -476,6 +511,7 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
         allianceAssignedTeams,
         hideAllianceAssignedTeams,
         defenseTargetTeamFilter,
+        cvMetricsByTeam,
     ]);
 
     // Add team to a pick list
@@ -762,6 +798,7 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
         teamLookupTeams,
         pickListEventTeamCount: availableTeams.length,
         filteredAndSortedTeams,
+        cvMetricsByTeam,
         pickLists,
         alliances,
         backups,

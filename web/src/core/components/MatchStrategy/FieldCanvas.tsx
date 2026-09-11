@@ -17,14 +17,17 @@ import { useFieldOrientation } from "@/core/hooks/useFieldOrientation";
 import { useIsMobile } from "@/core/hooks/use-mobile";
 import { useCanvasDrawing } from "@/core/hooks/useCanvasDrawing";
 import { useCanvasSetup } from "@/core/hooks/useCanvasSetup";
-import { drawSelectedAutoRoutines, drawTeamNumbersAndSpots, getAutoRoutineSlotAtPoint } from "@/core/lib/canvasUtils";
+import { drawSelectedAutoRoutines, drawTeamNumbersAndSpots, drawCvTrailLayers, getAutoRoutineSlotAtPoint } from "@/core/lib/canvasUtils";
 import { FieldCanvasHeader } from "./FieldCanvasHeader";
 import { MobileStageControls } from "./MobileStageControls";
 import { DrawingControls } from "./DrawingControls";
 import { FloatingControls } from "./FloatingControls";
 import { Button } from "@/core/components/ui/button";
+import { Checkbox } from "@/core/components/ui/checkbox";
+import { Label } from "@/core/components/ui/label";
 import { Play, Pause, RotateCcw } from "lucide-react";
 import type { StrategyAutoRoutine, StrategyStageId, TeamStageSpots } from "@/core/hooks/useMatchStrategy";
+import type { CvOverlayTrail } from "@/core/lib/canvasUtils";
 
 interface TeamSlotSpotVisibility {
     showShooting: boolean;
@@ -39,6 +42,9 @@ interface FieldCanvasProps {
     teamSlotSpotVisibility?: TeamSlotSpotVisibility[];
     getTeamSpots?: (teamNumber: number | null, stageId: StrategyStageId) => TeamStageSpots;
     selectedAutoRoutinesBySlot?: (StrategyAutoRoutine | null)[];
+    cvTrailLayers?: CvOverlayTrail[];
+    showCvTrails?: boolean;
+    onShowCvTrailsChange?: (show: boolean) => void;
 }
 
 const MIN_REPLAY_DURATION_MS = 6000;
@@ -103,6 +109,9 @@ const FieldCanvas = ({
     teamSlotSpotVisibility = [],
     getTeamSpots,
     selectedAutoRoutinesBySlot = [],
+    cvTrailLayers = [],
+    showCvTrails = false,
+    onShowCvTrailsChange,
 }: FieldCanvasProps) => {
     // Canvas refs for the 3-layer architecture
     const backgroundCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -252,6 +261,8 @@ const FieldCanvas = ({
         selectedAutoRoutinesBySlot,
         isolatedAutoSlot,
         autoReplayProgress,
+        cvTrailLayers,
+        showCvTrails,
         onCanvasReady: handleCanvasReady,
         onDimensionsChange: setCanvasDimensions
     });
@@ -344,6 +355,14 @@ const FieldCanvas = ({
             isolatedAutoSlot,
             undefined,
         );
+        if (showCvTrails && cvTrailLayers.length > 0) {
+            drawCvTrailLayers(
+                ctx,
+                canvasDimensions.width,
+                canvasDimensions.height,
+                cvTrailLayers,
+            );
+        }
         ctx.drawImage(drawingCanvas, 0, 0);
 
         const dataURL = compositeCanvas.toDataURL('image/png');
@@ -385,8 +404,26 @@ const FieldCanvas = ({
         selectedAutoRoutinesBySlot,
         isolatedAutoSlot,
         isFieldRotated,
+        showCvTrails,
+        cvTrailLayers,
     ]);
 
+    const cvTrailToggle = onShowCvTrailsChange ? (
+        <div className="flex items-center gap-2 px-2 py-1">
+            <Checkbox
+                id={`cv-trails-${currentStageId}`}
+                checked={showCvTrails}
+                onCheckedChange={(checked) => onShowCvTrailsChange(checked === true)}
+                disabled={cvTrailLayers.length === 0}
+            />
+            <Label
+                htmlFor={`cv-trails-${currentStageId}`}
+                className="text-xs font-medium cursor-pointer"
+            >
+                CV trails{cvTrailLayers.length === 0 ? ' (none loaded)' : ` (${cvTrailLayers.length})`}
+            </Label>
+        </div>
+    ) : null;
     const replayStatusText = visibleAutoRoutines.length > 0
         ? `${Math.round((replayDurationMs / 1000) * 10) / 10}s replay`
         : 'No auto path selected';
@@ -612,25 +649,28 @@ const FieldCanvas = ({
                 />
 
                 {(!hideControls || !isMobile) && (
-                    <DrawingControls
-                        isErasing={isErasing}
-                        brushSize={brushSize}
-                        brushColor={brushColor}
-                        currentStageId={currentStageId}
-                        isMobile={isMobile}
-                        isFullscreen={isFullscreen}
-                        canUndo={canUndo}
-                        isFieldRotated={isFieldRotated}
-                        onToggleErasing={setIsErasing}
-                        onBrushSizeChange={setBrushSize}
-                        onBrushColorChange={setBrushColor}
-                        onClearCanvas={handleClearCanvas}
-                        onSaveCanvas={() => saveCanvas(true)}
-                        onUndo={undo}
-                        onToggleFieldOrientation={toggleFieldOrientation}
-                        onToggleFullscreen={toggleFullscreen}
-                        onToggleHideControls={() => setHideControls(!hideControls)}
-                    />
+                    <>
+                        <DrawingControls
+                            isErasing={isErasing}
+                            brushSize={brushSize}
+                            brushColor={brushColor}
+                            currentStageId={currentStageId}
+                            isMobile={isMobile}
+                            isFullscreen={isFullscreen}
+                            canUndo={canUndo}
+                            isFieldRotated={isFieldRotated}
+                            onToggleErasing={setIsErasing}
+                            onBrushSizeChange={setBrushSize}
+                            onBrushColorChange={setBrushColor}
+                            onClearCanvas={handleClearCanvas}
+                            onSaveCanvas={() => saveCanvas(true)}
+                            onUndo={undo}
+                            onToggleFieldOrientation={toggleFieldOrientation}
+                            onToggleFullscreen={toggleFullscreen}
+                            onToggleHideControls={() => setHideControls(!hideControls)}
+                        />
+                        {cvTrailToggle}
+                    </>
                 )}
 
                 {replayControls && (
@@ -691,6 +731,7 @@ const FieldCanvas = ({
                 onToggleFullscreen={toggleFullscreen}
                 onToggleHideControls={() => setHideControls(!hideControls)}
             />
+            {cvTrailToggle}
 
             {replayControls && (
                 <div className="mt-2 px-2 py-2 border rounded-md bg-background/60">
