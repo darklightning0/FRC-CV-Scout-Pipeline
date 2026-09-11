@@ -98,6 +98,23 @@ def process_ai_telemetry(
             continue
 
         records = sorted(records, key=lambda r: r.get("frame", 0))
+        # Drop ID-swap teleports before distance / path export (fixes scribble trails)
+        try:
+            from trajectory_clean import clean_team_records
+            fps = float(data.get("fps") or data.get("video_fps") or 60.0)
+            before = len(records)
+            records = clean_team_records(records, fps=fps)
+            if before and len(records) < before * 0.5:
+                print(
+                    f"  • Team {team_id}: teleport filter kept {len(records)}/{before} points "
+                    f"(likely ID mix)"
+                )
+        except Exception as exc:
+            print(f"  • Team {team_id}: clean skipped ({exc})")
+
+        if not records:
+            continue
+
         alliance = _infer_alliance(records, red_set, blue_set, str(team_id))
 
         speeds = [r.get("speed_mps", 0) for r in records if r.get("speed_mps", 0) > 0]
@@ -108,9 +125,10 @@ def process_ai_telemetry(
         for i in range(1, len(records)):
             x1, y1 = records[i - 1]["x_m"], records[i - 1]["y_m"]
             x2, y2 = records[i]["x_m"], records[i]["y_m"]
-            if x1 > 0 and y1 > 0 and x2 > 0 and y2 > 0:
+            if x1 >= 0 and y1 >= 0 and x2 >= 0 and y2 >= 0:
                 d = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-                if d < 3.0:
+                # Ignore residual teleports in distance (robot can't jump >1.5m/sample)
+                if d < 1.5:
                     total_dist += d
 
         alliance_cnt = neutral_cnt = opponent_cnt = total_valid = 0
