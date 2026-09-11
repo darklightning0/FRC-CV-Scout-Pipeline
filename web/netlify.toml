@@ -1,11 +1,5 @@
-# Functions must not fall through to the SPA shell
-[[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-  force = true
-
-# Redirect all other requests to index.html for SPA routing
+# SPA fallback. Netlify serves /.netlify/functions/* before this rule;
+# do not add a redirect from "/.netlify/*" — Netlify rejects that path.
 [[redirects]]
   from = "/*"
   to = "/index.html"
