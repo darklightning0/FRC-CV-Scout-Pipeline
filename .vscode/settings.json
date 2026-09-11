@@ -1,0 +1,19 @@
+{
+    "python-envs.pythonProjects": [
+        {
+            "path": ".venv",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ],
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "Thumbs.db": true,
+        "**/__pycache__": true,
+        ".venv": true
+    }
+}

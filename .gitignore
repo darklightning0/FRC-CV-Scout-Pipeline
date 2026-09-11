@@ -1,0 +1,55 @@
+# ==============================================================================
+# ML / Robot Detector Workspace .gitignore
+# ==============================================================================
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python compiled files & caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# macOS system files
+.DS_Store
+
+# Large datasets, videos, and zip files inside data/
+data/dataset_frames/
+data/match_library/
+data/Robot-Detection-1/
+*.zip
+
+# Model weights inside models/ or root
+models/*.pt
+models/*.onnx
+models/*.engine
+*.pt
+*.onnx
+
+# YOLO predict / run outputs
+outputs/runs/
+
+# Video outputs
+outputs/videos/
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Temporary reference extracts
+.tmp-maneuver/
+.tmp-maneuver.zip
+
+# Legacy custom scout UI (kept for reference)
+web-legacy/node_modules/
+web-legacy/dist/
+
+# Maneuver env secrets
+web/.env
+web/.env.local

@@ -1,0 +1,223 @@
+/**
+ * Individual connected scout card with request/push/disconnect actions
+ */
+
+import { useState } from 'react';
+import { Button } from '@/core/components/ui/button';
+import { Badge } from '@/core/components/ui/badge';
+import { AlertCircle, CheckCircle2, Loader2, X } from 'lucide-react';
+import { toast } from 'sonner';
+import type { TransferDataType } from '@/core/contexts/WebRTCContext';
+import { applyFilters, filterPitScoutingEntries, filterScoutProfilePayload, type DataFilters } from '@/core/lib/dataFiltering';
+import { buildPitAssignmentsTransferPayload } from '@/core/lib/pitAssignmentTransfer';
+import { debugLog } from '@/core/lib/peerTransferUtils';
+
+interface ReceivedDataEntry {
+    scoutName: string;
+    data: unknown;
+    timestamp: number;
+}
+
+interface ConnectedScout {
+    id: string;
+    name: string;
+    channel?: RTCDataChannel | null;
+}
+
+interface ConnectedScoutCardProps {
+    scout: ConnectedScout;
+    isRequesting: boolean;
+    receivedData: ReceivedDataEntry[];
+    dataType: TransferDataType;
+    pushFilters?: DataFilters;
+    onRequestData: (scoutId: string) => void;
+    onPushData: (scoutId: string, data: unknown, dataType: TransferDataType) => void;
+    onDisconnect: (scoutId: string) => void;
+    onAddToHistory: (entry: ReceivedDataEntry) => void;
+}
+
+export function ConnectedScoutCard({
+    scout,
+    isRequesting,
+    receivedData,
+    dataType,
+    pushFilters,
+    onRequestData,
+    onPushData,
+    onDisconnect,
+    onAddToHistory,
+}: ConnectedScoutCardProps) {
+    const [isPushing, setIsPushing] = useState(false);
+
+    const isReady = scout.channel?.readyState === 'open';
+
+    const scoutReceivedData = receivedData.filter(d => d.scoutName === scout.name);
+    const receivedLog = scoutReceivedData[scoutReceivedData.length - 1];
+    const hasReceived = !!receivedLog;
+
+    const handlePush = async () => {
+        setIsPushing(true);
+        try {
+            debugLog('📤 Pushing', dataType, 'data to', scout.name);
+            let data: unknown;
+
+            switch (dataType) {
+                case 'scouting': {
+                    const { loadScoutingData } = await import('@/core/lib/scoutingDataUtils');
+                    let entries = await loadScoutingData();
+                    if (pushFilters) {
+                        entries = applyFilters({ entries, version: '3.0-maneuver-core', exportedAt: Date.now() }, pushFilters).entries;
+                    }
+                    data = {
+                        entries,
+                        version: '3.0-maneuver-core',
+                        exportedAt: Date.now()
+                    };
+                    break;
+                }
+                case 'pit-scouting': {
+                    const { loadPitScoutingData } = await import('@/core/lib/pitScoutingUtils');
+                    const pitData = await loadPitScoutingData();
+                    data = {
+                        entries: pushFilters ? filterPitScoutingEntries(pitData.entries, pushFilters) : pitData.entries,
+                        version: '3.0-maneuver-core',
+                        exportedAt: Date.now()
+                    };
+                    break;
+                }
+                case 'pit-assignments': {
+                    const eventKey = localStorage.getItem('eventKey') || localStorage.getItem('eventName') || '';
+                    const sourceScoutName = localStorage.getItem('currentScout') || 'Lead Scout';
+
+                    if (!eventKey) {
+                        throw new Error('No active event found for pit assignment transfer');
+                    }
+
+                    data = buildPitAssignmentsTransferPayload(eventKey, sourceScoutName);
+                    break;
+                }
+                case 'match': {
+                    const matchDataStr = localStorage.getItem('matchData');
+                    const matches = matchDataStr ? JSON.parse(matchDataStr) : [];
+                    data = { matches };
+                    break;
+                }
+                case 'scout': {
+                    const { gamificationDB } = await import('@/game-template/gamification/database');
+                    const scouts = await gamificationDB.scouts.toArray();
+                    const predictions = await gamificationDB.predictions.toArray();
+                    const achievements = await gamificationDB.scoutAchievements.toArray();
+                    data = pushFilters
+                        ? filterScoutProfilePayload({ scouts, predictions, achievements }, pushFilters)
+                        : { scouts, predictions, achievements };
+                    break;
+                }
+                case 'combined': {
+                    const { loadScoutingData } = await import('@/core/lib/scoutingDataUtils');
+                    const { gamificationDB } = await import('@/game-template/gamification/database');
+
+                    const [entries, scouts, predictions] = await Promise.all([
+                        loadScoutingData(),
+                        gamificationDB.scouts.toArray(),
+                        gamificationDB.predictions.toArray()
+                    ]);
+
+                    const filteredEntries = pushFilters
+                        ? applyFilters({ entries, version: '1.0', exportedAt: Date.now() }, pushFilters).entries
+                        : entries;
+
+                    data = {
+                        entries: filteredEntries,
+                        metadata: {
+                            exportedAt: new Date().toISOString(),
+                            version: "1.0",
+                            scoutingEntriesCount: filteredEntries.length,
+                            scoutsCount: scouts.length,
+                            predictionsCount: predictions.length
+                        },
+                        scoutProfiles: {
+                            scouts,
+                            predictions
+                        }
+                    };
+                    break;
+                }
+            }
+
+            onPushData(scout.id, data, dataType);
+
+            onAddToHistory({
+                scoutName: scout.name,
+                data: { type: 'pushed', dataType },
+                timestamp: Date.now()
+            });
+
+            toast.info(`Pushed ${dataType} to ${scout.name}`);
+        } catch (err) {
+            console.error('Failed to push data:', err);
+            toast.error('Failed to push data to ' + scout.name);
+        } finally {
+            setIsPushing(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-3 p-3 border rounded-lg sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-1 flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                    {isRequesting ? (
+                        <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+                    ) : hasReceived ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : isReady ? (
+                        <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                    ) : (
+                        <AlertCircle className="h-4 w-4 text-yellow-500" />
+                    )}
+                    <span className="font-medium">{scout.name}</span>
+                </div>
+                <div className="flex items-center gap-2 ml-6">
+                    {isRequesting && (
+                        <Badge variant="outline" className="text-xs text-blue-600 animate-pulse">
+                            Receiving...
+                        </Badge>
+                    )}
+                    {hasReceived && receivedLog && !isRequesting && (
+                        <span className="text-xs text-muted-foreground">
+                            Last received: {new Date(receivedLog.timestamp).toLocaleTimeString()}
+                        </span>
+                    )}
+                </div>
+            </div>
+            <div className="flex w-full gap-2 sm:w-auto sm:flex-none">
+                <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => onRequestData(scout.id)}
+                    disabled={!isReady || isRequesting}
+                    className="flex-1 sm:flex-none"
+                >
+                    {isRequesting ? '...' : 'Request'}
+                </Button>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePush}
+                    disabled={!isReady || isPushing}
+                    className="flex-1 sm:flex-none"
+                >
+                    {isPushing ? '...' : 'Push'}
+                </Button>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onDisconnect(scout.id)}
+                    className="px-2"
+                    title="Disconnect scout"
+                >
+                    <X className="h-4 w-4" />
+                </Button>
+            </div>
+        </div>
+    );
+}

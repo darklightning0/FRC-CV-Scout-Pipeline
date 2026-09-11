@@ -1,0 +1,31 @@
+# Functions must not fall through to the SPA shell
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+  force = true
+
+# Redirect all other requests to index.html for SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+# Set in Netlify UI → Site settings → Environment variables:
+#   CV_SYNC_API_KEY = <shared secret with analysis laptop>
+
+[dev]
+  command = "vite --port 5173 --host"
+  targetPort = 5173
+  port = 8888
+  publish = "dist"
+  autoLaunch = false
+  framework = "#custom"

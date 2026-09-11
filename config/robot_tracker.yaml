@@ -1,0 +1,8 @@
+# FRC Custom ByteTrack Configuration
+tracker_type: bytetrack  
+track_high_thresh: 0.3   # Lowered: Accept lower confidence boxes as valid tracks
+track_low_thresh: 0.1    # Allow very faint boxes (hidden in fuel) to keep the track alive
+new_track_thresh: 0.4    # Lowered: Easier to spawn a track initially
+track_buffer: 120        # THE FIX: Remember lost robots for 120 frames (4 seconds) instead of 30!
+match_thresh: 0.9        # Loosened: Allow robots to move further between frames without dropping the ID
+fuse_score: True         # Fuse detection score with motion/IoU for matching; stabilizes weak detections

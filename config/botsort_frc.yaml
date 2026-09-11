@@ -1,0 +1,88 @@
+# FRC-Tuned BoT-SORT Tracker Configuration
+# =========================================================
+# Derived from the Ultralytics default botsort.yaml.
+# Each parameter is explained with FRC-specific rationale.
+#
+# To use in master_pipeline.py, update the run_inference call:
+#   tracker="config/botsort_frc.yaml"
+# =========================================================
+
+tracker_type: botsort
+
+# ── DETECTION THRESHOLDS ──────────────────────────────────
+# Default: track_high_thresh=0.25  track_low_thresh=0.1  new_track_thresh=0.25
+#
+# FRC context:
+#   - We run YOLO at conf=0.15 to catch occluded/distant robots.
+#   - Lowering track_high_thresh allows moderate-confidence detections
+#     to participate in first-stage matching rather than only second-stage.
+#   - new_track_thresh should be ≥ track_high_thresh to prevent noise blobs
+#     from spawning spurious new tracks (especially yellow game pieces).
+
+track_high_thresh: 0.20   # Lowered from 0.25 — keeps weak-but-valid robot detections in first-stage match
+track_low_thresh:  0.10   # Keep default — needed to recover robots temporarily behind game pieces
+new_track_thresh:  0.25   # Keep default — prevents field structures from spawning new tracks
+
+# ── OCCLUSION BUFFER ─────────────────────────────────────
+# Default: track_buffer=30  (≈1 second at 30 FPS)
+#
+# FRC context:
+#   - Robots frequently pass behind the goal tower, field elements, and
+#     each other during endgame climbs. 30 frames (1 second) is the right
+#     amount to bridge these occlusions without accumulating stale ghosts.
+#   - Our custom Greedy Stitcher adds another 30-frame coasting layer on top,
+#     so the total "memory" window per robot is 2 seconds.
+
+track_buffer: 30          # Keep default — doubles with our 30-frame Greedy coast layer
+
+# ── ASSOCIATION THRESHOLD ────────────────────────────────
+# Default: match_thresh=0.8
+#
+# FRC context:
+#   - FRC swerve drive robots can move ~12 ft/s and spin 360° instantly.
+#     At 1080p, that corresponds to ~80–160 pixels of displacement per frame.
+#   - A strict match_thresh=0.8 (IoU-based) causes track drops when a fast
+#     robot's bounding box has minimal overlap with the previous frame's box.
+#   - Lowering to 0.65 allows the tracker to re-associate across larger
+#     frame-to-frame displacements typical of fast swerve robots.
+
+match_thresh: 0.65        # Lowered from 0.8 — handles fast swerve drives crossing at full speed
+
+# ── DETECTION SCORE FUSION ───────────────────────────────
+# Default: fuse_score=True
+#
+# Keep enabled: fusing the YOLO confidence score into the association cost
+# stabilises matches for weak detections (e.g., partially occluded robots
+# running at conf=0.15–0.20). Without this, low-confidence boxes are more
+# likely to be dropped mid-track.
+
+fuse_score: True          # Keep default — critical for stability at low YOLO confidence
+
+# ── GLOBAL MOTION COMPENSATION ───────────────────────────
+# Default: gmc_method=sparseOptFlow
+#
+# FRC context:
+#   - The match camera is static (no panning/tilting). GMC is designed for
+#     moving cameras and has no benefit here.
+#   - Disabling it saves ~5–10 ms per frame, which compounds across
+#     the full 5,400-frame match processing run.
+
+gmc_method: none          # Changed from sparseOptFlow — static camera; GMC adds overhead only
+
+# ── ReID (RE-IDENTIFICATION) ─────────────────────────────
+# Default: proximity_thresh=0.5  appearance_thresh=0.8  with_reid=False
+#
+# FRC context:
+#   - ReID is disabled (with_reid=False). Our custom Greedy Stitcher with
+#     last_botsort_id memory and the -1000 distance discount already
+#     handles the identity-through-crossing problem.
+#   - Enabling ReID would require a separate model download and doubles
+#     inference time; the Greedy layer makes it redundant here.
+#
+# Optional upgrade: set with_reid=True and model=auto if you see persistent
+# ID swaps after endgame climbs and can accept the compute cost.
+
+proximity_thresh:   0.3   # Lowered from 0.5 — FRC robots are large and overlap less than pedestrians
+appearance_thresh:  0.6   # Lowered from 0.8 — robots may be partially occluded or bumper-facing only
+with_reid:         True   # ENABLED — fuses visual appearance features into track association
+model:             auto   # Uses built-in feature extractor from the YOLO backbone (no separate download needed)

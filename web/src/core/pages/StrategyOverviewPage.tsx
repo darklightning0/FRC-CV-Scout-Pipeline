@@ -1,0 +1,285 @@
+import { useState, useMemo, useEffect, useDeferredValue } from "react";
+import { useTeamStatistics } from "@/core/hooks/useTeamStatistics";
+import { useChartData } from "@/core/hooks/useChartData";
+import { strategyConfig } from "@/game/strategy-config";
+import { StrategyHeader } from "@/core/components/Strategy/StrategyHeader";
+import { StrategyChart } from "@/core/components/Strategy/StrategyChart";
+import { TeamStatsTableEnhanced } from "@/core/components/Strategy/TeamStatsTableEnhanced";
+import { AggregationType, ColumnFilter, FilterOperator } from "@/core/types/strategy";
+import { Skeleton } from "@/core/components/ui/skeleton";
+
+export default function StrategyOverviewPage() {
+    const [selectedEvents, setSelectedEvents] = useState<string[]>(["all"]);
+    const [aggregationType, setAggregationType] = useState<AggregationType>("average");
+    const [chartType, setChartType] = useState<"bar" | "scatter" | "box" | "stacked">("bar");
+    const [chartMetric, setChartMetric] = useState<string>(
+        strategyConfig.columns.find(col => col.numeric && col.key !== "matchCount")?.key || "rawValues.totalPoints"
+    );
+    const [scatterXMetric, setScatterXMetric] = useState<string>("teamNumber");
+    const [scatterYMetric, setScatterYMetric] = useState<string>(
+        strategyConfig.columns.find(col => col.numeric && col.key !== "matchCount")?.key || "rawValues.totalPoints"
+    );
+
+    const [columnConfig, setColumnConfig] = useState(strategyConfig.columns);
+    const [columnFilters, setColumnFilters] = useState<Record<string, ColumnFilter>>({});
+    const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
+
+    // Load data on mount
+    useEffect(() => {
+        // Load saved settings from localStorage
+        const savedAggregation = localStorage.getItem("strategy_aggregation");
+        if (savedAggregation) setAggregationType(savedAggregation as AggregationType);
+
+        const savedChartType = localStorage.getItem("strategy_chartType");
+        if (savedChartType) setChartType(savedChartType as any);
+
+        const savedChartMetric = localStorage.getItem("strategy_chartMetric");
+        if (savedChartMetric) setChartMetric(savedChartMetric);
+
+        const savedColumnFilters = localStorage.getItem("strategy_columnFilters");
+        if (savedColumnFilters) {
+            try {
+                setColumnFilters(JSON.parse(savedColumnFilters));
+            } catch (e) {
+                console.error("Failed to parse saved column filters", e);
+            }
+        }
+
+        const savedVisibleColumns = localStorage.getItem("strategy_visibleColumns");
+        if (savedVisibleColumns) {
+            try {
+                const visibleKeys = JSON.parse(savedVisibleColumns) as string[];
+                setColumnConfig(prev => prev.map(col => ({
+                    ...col,
+                    visible: visibleKeys.includes(col.key)
+                })));
+            } catch (e) {
+                console.error("Failed to parse saved visible columns", e);
+            }
+        }
+    }, []);
+
+    // Save settings when they change
+    useEffect(() => {
+        localStorage.setItem("strategy_aggregation", aggregationType);
+    }, [aggregationType]);
+
+    useEffect(() => {
+        localStorage.setItem("strategy_chartType", chartType);
+    }, [chartType]);
+
+    useEffect(() => {
+        localStorage.setItem("strategy_chartMetric", chartMetric);
+    }, [chartMetric]);
+
+    useEffect(() => {
+        localStorage.setItem("strategy_columnFilters", JSON.stringify(columnFilters));
+    }, [columnFilters]);
+
+    useEffect(() => {
+        const visibleKeys = columnConfig.filter(col => col.visible).map(col => col.key);
+        localStorage.setItem("strategy_visibleColumns", JSON.stringify(visibleKeys));
+    }, [columnConfig]);
+
+    const selectedEventFilter = useMemo<string | string[] | undefined>(() => {
+        if (selectedEvents.length === 0 || selectedEvents.includes("all")) {
+            return undefined;
+        }
+        if (selectedEvents.length === 1) {
+            return selectedEvents[0];
+        }
+        return selectedEvents;
+    }, [selectedEvents]);
+
+    const shouldShowAllChartTeams = useMemo(() => {
+        return selectedEvents.length === 1 && selectedEvents[0] !== "all";
+    }, [selectedEvents]);
+
+    const requiredMetricKeys = useMemo(() => {
+        const keys = new Set<string>();
+
+        columnConfig.forEach((column) => {
+            if (column.visible) {
+                keys.add(column.key);
+            }
+        });
+
+        Object.keys(columnFilters).forEach((key) => keys.add(key));
+
+        if (chartType === "scatter") {
+            keys.add(scatterXMetric);
+            keys.add(scatterYMetric);
+        } else {
+            keys.add(chartMetric);
+        }
+
+        return keys;
+    }, [columnConfig, columnFilters, chartType, chartMetric, scatterXMetric, scatterYMetric]);
+
+    const requiresFuelOpr = useMemo(() => {
+        return Array.from(requiredMetricKeys).some((key) =>
+            key === "fuelTotalOPR" || key === "fuelAutoOPR" || key === "fuelTeleopOPR" || key === "fuelOprLambda"
+        );
+    }, [requiredMetricKeys]);
+
+    const requiresRollingRatings = useMemo(() => {
+        return Array.from(requiredMetricKeys).some((key) =>
+            key === "latestRollingFuelOPR" || key === "latestRollingFuelCOPR" || key === "latestRollingRatingsMatchCount"
+        );
+    }, [requiredMetricKeys]);
+
+    // Calculate statistics using centralized hook
+    const { teamStats, filteredTeamStats, isLoading, error, availableEvents } = useTeamStatistics(
+        selectedEventFilter,
+        { ...strategyConfig, columns: columnConfig },
+        columnFilters,
+        aggregationType,
+        { includeFuelOpr: requiresFuelOpr, includeRollingRatings: requiresRollingRatings }
+    );
+    const deferredTeamStats = useDeferredValue(teamStats);
+    const deferredFilteredTeamStats = useDeferredValue(filteredTeamStats);
+    const isHeavyContentPending =
+        deferredTeamStats !== teamStats || deferredFilteredTeamStats !== filteredTeamStats;
+
+    // Prepare chart data using generic hook
+    const { chartData, chartConfig } = useChartData(
+        deferredFilteredTeamStats,
+        chartType,
+        chartMetric,
+        scatterXMetric,
+        scatterYMetric,
+        { ...strategyConfig, columns: columnConfig },
+        shouldShowAllChartTeams ? "all" : 12
+    );
+
+    // Handlers
+    const handleToggleColumn = (key: string) => {
+        setColumnConfig(prev => prev.map(col =>
+            col.key === key ? { ...col, visible: !col.visible } : col
+        ));
+    };
+
+    const handleApplyPreset = (presetKey: string) => {
+        const preset = strategyConfig.presets[presetKey];
+        if (preset) {
+            setColumnConfig(prev => prev.map(col => ({
+                ...col,
+                visible: preset.includes(col.key)
+            })));
+        }
+    };
+
+    const handleSetColumnFilter = (columnKey: string, operator: FilterOperator, value: number) => {
+        setColumnFilters(prev => ({
+            ...prev,
+            [columnKey]: { operator, value }
+        }));
+    };
+
+    const handleRemoveColumnFilter = (columnKey: string) => {
+        setColumnFilters(prev => {
+            const next = { ...prev };
+            delete next[columnKey];
+            return next;
+        });
+    };
+
+    const handleClearAllFilters = () => {
+        setColumnFilters({});
+    };
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center min-h-screen text-destructive">
+                <div className="text-center">
+                    <h2 className="text-lg font-semibold">Error Loading Data</h2>
+                    <p className="text-muted-foreground">{error.message}</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col min-h-screen gap-6 p-4">
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                        <Skeleton className="h-10 w-64" />
+                        <div className="flex gap-2">
+                            <Skeleton className="h-10 w-32" />
+                            <Skeleton className="h-10 w-32" />
+                        </div>
+                    </div>
+                </div>
+                <Skeleton className="h-[400px] w-full rounded-xl" />
+                <div className="space-y-2">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col min-h-screen gap-6 px-4 pt-12 pb-24">
+            <StrategyHeader
+                filteredTeamCount={deferredFilteredTeamStats.length}
+                totalTeamCount={deferredTeamStats.length}
+                activeFilterCount={Object.keys(columnFilters).length}
+                selectedEvents={selectedEvents}
+                onEventChange={setSelectedEvents}
+                availableEvents={availableEvents}
+                aggregationType={aggregationType}
+                onAggregationTypeChange={setAggregationType}
+                onClearAllFilters={handleClearAllFilters}
+                isSettingsOpen={false} // Placeholder for header settings if needed
+                onSettingsOpenChange={() => { }}
+                chartType={chartType}
+                onChartTypeChange={setChartType}
+            />
+
+            {isHeavyContentPending ? (
+                <>
+                    <Skeleton className="h-[350px] w-full rounded-xl" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-20 w-full" />
+                        <Skeleton className="h-20 w-full" />
+                    </div>
+                </>
+            ) : (
+                <>
+                    <StrategyChart
+                        chartData={chartData}
+                        chartType={chartType}
+                        onChartTypeChange={setChartType}
+                        chartMetric={chartMetric}
+                        onChartMetricChange={setChartMetric}
+                        scatterXMetric={scatterXMetric}
+                        onScatterXMetricChange={setScatterXMetric}
+                        scatterYMetric={scatterYMetric}
+                        onScatterYMetricChange={setScatterYMetric}
+                        columnConfig={columnConfig}
+                        chartConfig={chartConfig}
+                    />
+
+                    <TeamStatsTableEnhanced
+                        teamStats={deferredTeamStats}
+                        filteredTeamStats={deferredFilteredTeamStats}
+                        columnConfig={columnConfig}
+                        columnFilters={columnFilters}
+                        onToggleColumn={handleToggleColumn}
+                        onApplyPreset={handleApplyPreset}
+                        onSetColumnFilter={handleSetColumnFilter}
+                        onRemoveColumnFilter={handleRemoveColumnFilter}
+                        onClearAllFilters={handleClearAllFilters}
+                        isColumnSettingsOpen={isColumnSettingsOpen}
+                        onColumnSettingsOpenChange={setIsColumnSettingsOpen}
+                    />
+                </>
+            )}
+        </div>
+    );
+}

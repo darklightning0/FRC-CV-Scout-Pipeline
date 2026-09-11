@@ -1,0 +1,26 @@
+{
+  "event_key": "2026tuis2",
+  "processed": {
+    "2026tuis2_f1m2": {
+      "youtube": "https://www.youtube.com/watch?v=krVfOFZfywI",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_f1m2/ai_scout_bundle.json",
+      "at": "2026-09-10T21:54:46.887830+00:00"
+    },
+    "2026tuis2_qm1": {
+      "youtube": "https://www.youtube.com/watch?v=D6KCIutdnlA",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm1/ai_scout_bundle.json",
+      "at": "2026-09-10T22:02:39.094509+00:00"
+    },
+    "2026tuis2_qm10": {
+      "youtube": "https://www.youtube.com/watch?v=PuhwOVtdPn8",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm10/ai_scout_bundle.json",
+      "at": "2026-09-10T22:10:18.597977+00:00"
+    }
+  },
+  "failed": {
+    "2026tuis2_f1m1": {
+      "error": "Pipeline failed for 2026tuis2_f1m1 (exit 1)",
+      "at": "2026-09-10T21:45:55.952759+00:00"
+    }
+  }
+}
