@@ -1,0 +1,30 @@
+{
+  "event_key": "2026tuis2",
+  "processed": {
+    "2026tuis2_qm1": {
+      "youtube": "https://www.youtube.com/watch?v=D6KCIutdnlA",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm1/ai_scout_bundle.json",
+      "remote_api": "https://huntereyes.netlify.app/.netlify/functions/cv-api",
+      "at": "2026-09-11T12:18:29.386661+00:00"
+    },
+    "2026tuis2_qm2": {
+      "youtube": "https://www.youtube.com/watch?v=nFnfqvgmTD4",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm2/ai_scout_bundle.json",
+      "remote_api": "https://huntereyes.netlify.app/.netlify/functions/cv-api",
+      "at": "2026-09-11T12:26:05.614521+00:00"
+    },
+    "2026tuis2_qm3": {
+      "youtube": "https://www.youtube.com/watch?v=MlvWKqFcWc0",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm3/ai_scout_bundle.json",
+      "remote_api": "https://huntereyes.netlify.app/.netlify/functions/cv-api",
+      "at": "2026-09-11T12:34:45.350304+00:00"
+    },
+    "2026tuis2_qm4": {
+      "youtube": "https://www.youtube.com/watch?v=X-fSifC1Gp4",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm4/ai_scout_bundle.json",
+      "remote_api": "https://huntereyes.netlify.app/.netlify/functions/cv-api",
+      "at": "2026-09-11T12:42:14.140917+00:00"
+    }
+  },
+  "failed": {}
+}

@@ -31,6 +31,7 @@ import {
   phaseLayersFromPaths,
   type CvTrailLayer,
 } from '@/core/components/cv-telemetry/CvTrailCanvas';
+import { BLUE_ALLIANCE_HUES, RED_ALLIANCE_HUES } from '@/core/lib/cvFieldCoords';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/core/components/ui/card';
 import { Button } from '@/core/components/ui/button';
 import { Badge } from '@/core/components/ui/badge';
@@ -182,21 +183,42 @@ export function CvTeamStatsTab({
       auto: currentCvEntry.autoPath,
       teleop: currentCvEntry.teleopPath,
       endgame: currentCvEntry.endgamePath,
+      alliance: currentCvEntry.alliance === 'red' ? 'red' : 'blue',
     });
   }, [currentCvEntry]);
 
-  const eventTrailLayers = useMemo((): CvTrailLayer[] => {
-    const palette = ['#22d3ee', '#a78bfa', '#f59e0b', '#34d399', '#f472b6', '#60a5fa', '#fb7185'];
-    return cvEntries.map((entry, i) => ({
-      id: entry.matchKey,
-      label: entry.matchKey.replace(/^.*_/, ''),
-      color: palette[i % palette.length]!,
-      points:
-        entry.matchPath && entry.matchPath.length > 0
-          ? entry.matchPath
-          : entry.autoPath,
-      emphasis: entry.matchKey === currentCvEntry?.matchKey,
-    }));
+  const eventPhaseSections = useMemo(() => {
+    const build = (
+      key: 'autoPath' | 'teleopPath' | 'endgamePath',
+      label: string,
+      playbackRate: number
+    ) => {
+      const layers: CvTrailLayer[] = cvEntries
+        .map((entry, i) => {
+          const points =
+            key === 'autoPath'
+              ? entry.autoPath
+              : key === 'teleopPath'
+                ? entry.teleopPath ?? []
+                : entry.endgamePath ?? [];
+          const hues = entry.alliance === 'red' ? RED_ALLIANCE_HUES : BLUE_ALLIANCE_HUES;
+          return {
+            id: `${key}-${entry.matchKey}`,
+            label: entry.matchKey.replace(/^.*_/, ''),
+            color: hues[i % hues.length]!,
+            points,
+            emphasis: entry.matchKey === currentCvEntry?.matchKey,
+            playbackRate,
+          };
+        })
+        .filter((l) => l.points.length > 0);
+      return { label, layers, playbackRate };
+    };
+    return [
+      build('autoPath', 'Auto (all matches)', 1),
+      build('teleopPath', 'Teleop (all matches)', 2),
+      build('endgamePath', 'Endgame (all matches)', 1),
+    ];
   }, [cvEntries, currentCvEntry?.matchKey]);
 
   const handlePullFromLaptop = async () => {
@@ -540,20 +562,41 @@ export function CvTeamStatsTab({
           </CardHeader>
           {pathScope === 'match' ? (
             phaseLayers.length > 0 ? (
-              <CvTrailCanvas
-                layers={phaseLayers}
-                enableReplay
-                title={`Phases — ${currentCvEntry.matchKey}`}
-              />
+              <div className="space-y-6">
+                {phaseLayers.map((layer) => (
+                  <CvTrailCanvas
+                    key={layer.id}
+                    layers={[layer]}
+                    enableReplay
+                    defaultPlaybackRate={layer.playbackRate ?? 1}
+                    title={`${layer.label} — ${currentCvEntry.matchKey}${
+                      layer.playbackRate === 2 ? ' (2×)' : ' (realtime)'
+                    }`}
+                  />
+                ))}
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">No timed path points for this match yet.</p>
             )
           ) : (
-            <CvTrailCanvas
-              layers={eventTrailLayers}
-              enableReplay={false}
-              title={`All CV trails for team ${teamNumber}`}
-            />
+            <div className="space-y-6">
+              {eventPhaseSections.map((section) =>
+                section.layers.length > 0 ? (
+                  <CvTrailCanvas
+                    key={section.label}
+                    layers={section.layers}
+                    enableReplay
+                    defaultPlaybackRate={section.playbackRate}
+                    title={section.label}
+                  />
+                ) : null
+              )}
+              {eventPhaseSections.every((s) => s.layers.length === 0) && (
+                <p className="text-sm text-muted-foreground">
+                  No phase paths across matches yet — reprocess after exporter update.
+                </p>
+              )}
+            </div>
           )}
         </Card>
       )}
@@ -570,7 +613,7 @@ export function CvTeamStatsTab({
             <img
               src={currentCvEntry.heatmapDataUrl}
               alt={`CV heatmap for team ${teamNumber} in ${currentCvEntry.matchKey}`}
-              className="absolute inset-0 h-full w-full object-fill"
+              className="absolute inset-0 h-full w-full object-contain"
             />
           </div>
         </Card>
@@ -601,7 +644,7 @@ export function CvTeamStatsTab({
                     <img
                       src={e.heatmapDataUrl}
                       alt={e.matchKey}
-                      className="h-full w-full object-fill"
+                      className="h-full w-full object-contain"
                     />
                   </div>
                   <div className="px-2 py-1.5 text-xs font-medium">{e.matchKey}</div>

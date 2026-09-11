@@ -1,5 +1,5 @@
 /**
- * Match Strategy CV panel — alliance trails, stacked heatmaps, defense hot zones.
+ * Match Strategy CV panel — alliance trails, stacked heatmaps, defense proximity.
  */
 
 import { useMemo } from 'react';
@@ -13,13 +13,10 @@ import {
 } from '@/core/components/cv-telemetry/CvStackedHeatmapCanvas';
 import { CvDefenseHotZones } from '@/core/components/cv-telemetry/CvDefenseHotZones';
 import { useMatchCvTelemetry } from '@/core/hooks/useMatchCvTelemetry';
+import { BLUE_ALLIANCE_HUES, RED_ALLIANCE_HUES } from '@/core/lib/cvFieldCoords';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/core/components/ui/card';
 import { Badge } from '@/core/components/ui/badge';
 import { cn } from '@/core/lib/utils';
-
-const BLUE_COLORS = ['#38bdf8', '#22d3ee', '#67e8f9'];
-const RED_COLORS = ['#f87171', '#fb7185', '#f43f5e'];
-const STACK_COLORS = ['#38bdf8', '#a78bfa', '#34d399'];
 
 type MatchStrategyCvPanelProps = {
   eventKey: string;
@@ -27,6 +24,19 @@ type MatchStrategyCvPanelProps = {
   selectedTeams: (number | null)[];
   className?: string;
 };
+
+function resolveAlliance(
+  entryAlliance: string,
+  teamNumber: number,
+  selectedTeams: (number | null)[]
+): 'red' | 'blue' {
+  if (entryAlliance === 'red' || entryAlliance === 'blue') return entryAlliance;
+  // Match Strategy slots: 0–2 red, 3–5 blue
+  const slot = selectedTeams.indexOf(teamNumber);
+  if (slot >= 0 && slot < 3) return 'red';
+  if (slot >= 3) return 'blue';
+  return 'blue';
+}
 
 export function MatchStrategyCvPanel({
   eventKey,
@@ -44,43 +54,45 @@ export function MatchStrategyCvPanel({
     let bi = 0;
     let ri = 0;
     return entries.map((e) => {
-      const isBlue = e.alliance === 'blue' || selectedTeams.slice(0, 3).includes(e.teamNumber);
-      const color = isBlue
-        ? BLUE_COLORS[bi++ % BLUE_COLORS.length]!
-        : RED_COLORS[ri++ % RED_COLORS.length]!;
+      const alliance = resolveAlliance(e.alliance, e.teamNumber, selectedTeams);
+      const color =
+        alliance === 'blue'
+          ? BLUE_ALLIANCE_HUES[bi++ % BLUE_ALLIANCE_HUES.length]!
+          : RED_ALLIANCE_HUES[ri++ % RED_ALLIANCE_HUES.length]!;
       return {
         id: `${e.teamNumber}`,
-        label: String(e.teamNumber),
+        label: `${e.teamNumber} (${alliance})`,
         color,
-        points: e.autoPath.length > 0 ? e.autoPath : e.matchPath ?? [],
+        points: e.autoPath.length > 0 ? e.autoPath : [],
         emphasis: true,
+        playbackRate: 1,
       };
     });
   }, [entries, selectedTeams]);
 
   const blueStack = useMemo((): StackedHeatLayer[] => {
     return entries
-      .filter((e) => e.alliance === 'blue')
+      .filter((e) => resolveAlliance(e.alliance, e.teamNumber, selectedTeams) === 'blue')
       .slice(0, 3)
       .map((e, i) => ({
         id: `blue-${e.teamNumber}`,
         label: String(e.teamNumber),
-        color: STACK_COLORS[i % STACK_COLORS.length]!,
+        color: BLUE_ALLIANCE_HUES[i % BLUE_ALLIANCE_HUES.length]!,
         points: e.matchPath && e.matchPath.length > 0 ? e.matchPath : e.autoPath,
       }));
-  }, [entries]);
+  }, [entries, selectedTeams]);
 
   const redStack = useMemo((): StackedHeatLayer[] => {
     return entries
-      .filter((e) => e.alliance === 'red')
+      .filter((e) => resolveAlliance(e.alliance, e.teamNumber, selectedTeams) === 'red')
       .slice(0, 3)
       .map((e, i) => ({
         id: `red-${e.teamNumber}`,
         label: String(e.teamNumber),
-        color: STACK_COLORS[i % STACK_COLORS.length]!,
+        color: RED_ALLIANCE_HUES[i % RED_ALLIANCE_HUES.length]!,
         points: e.matchPath && e.matchPath.length > 0 ? e.matchPath : e.autoPath,
       }));
-  }, [entries]);
+  }, [entries, selectedTeams]);
 
   const heatmaps = entries.filter((e) => e.heatmapDataUrl);
   const selectedTeamNumbers = [...teamSet];
@@ -101,7 +113,7 @@ export function MatchStrategyCvPanel({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">CV overlay</CardTitle>
           <CardDescription>
-            No CV telemetry in Dexie for these teams yet — sync from HunterEyes / the watcher first.
+            No CV telemetry in Dexie for these teams yet — sync from Hunter Eyes / the watcher first.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -118,18 +130,29 @@ export function MatchStrategyCvPanel({
           </Badge>
         </div>
         <CardDescription>
-          Auto paths on Field Strategy when CV trails are enabled. Stacked heatmaps and defense
-          overlays use the same match telemetry.
+          Auto paths use distinct blue/red hues per robot. Enable CV trails on Field Strategy to draw
+          them on the main canvas too.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <CvTrailCanvas layers={layers} enableReplay title="Alliance auto paths" />
+        <CvTrailCanvas
+          layers={layers}
+          enableReplay
+          defaultPlaybackRate={1}
+          title="Alliance auto paths (realtime)"
+        />
 
         {blueStack.length > 0 && (
-          <CvStackedHeatmapCanvas layers={blueStack} title="Blue stacked heatmap (3 colors)" />
+          <CvStackedHeatmapCanvas
+            layers={blueStack}
+            title="Blue stacked heatmap (density only)"
+          />
         )}
         {redStack.length > 0 && (
-          <CvStackedHeatmapCanvas layers={redStack} title="Red stacked heatmap (3 colors)" />
+          <CvStackedHeatmapCanvas
+            layers={redStack}
+            title="Red stacked heatmap (density only)"
+          />
         )}
 
         <CvDefenseHotZones
@@ -140,7 +163,7 @@ export function MatchStrategyCvPanel({
 
         {heatmaps.length > 0 && (
           <div className="space-y-2">
-            <div className="text-sm font-medium">Per-team heatmaps</div>
+            <div className="text-sm font-medium">Per-team heatmaps (pipeline PNG)</div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {heatmaps.map((e) => (
                 <div key={e.id} className="overflow-hidden rounded-lg border">
@@ -148,7 +171,7 @@ export function MatchStrategyCvPanel({
                     <img
                       src={e.heatmapDataUrl}
                       alt={`Heatmap ${e.teamNumber}`}
-                      className="h-full w-full object-fill"
+                      className="h-full w-full object-contain"
                     />
                   </div>
                   <div className="px-2 py-1 text-xs font-medium">

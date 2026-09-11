@@ -1,16 +1,18 @@
 /**
- * Client-side stacked alliance heatmap (up to 3 colored densities) from CV paths.
+ * Client-side stacked alliance heatmap — density only (no scribble polylines).
+ * Y flipped to match Python heatmaps / meter-space telemetry.
  */
 
 import { useEffect, useRef } from 'react';
 import fieldImage from '@/game-template/assets/2026-field.png';
 import { cn } from '@/core/lib/utils';
+import { cvNormToCanvas } from '@/core/lib/cvFieldCoords';
 import type { CvFieldPoint } from '@/core/types/cv-telemetry';
 
 export type StackedHeatLayer = {
   id: string;
   label: string;
-  color: string; // css hex
+  color: string;
   points: CvFieldPoint[];
 };
 
@@ -22,9 +24,8 @@ type CvStackedHeatmapCanvasProps = {
 
 function hexToRgb(hex: string): [number, number, number] {
   const cleaned = hex.replace('#', '');
-  const full = cleaned.length === 3
-    ? cleaned.split('').map((c) => c + c).join('')
-    : cleaned;
+  const full =
+    cleaned.length === 3 ? cleaned.split('').map((c) => c + c).join('') : cleaned;
   const n = Number.parseInt(full, 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
@@ -59,8 +60,8 @@ export function CvStackedHeatmapCanvas({
       ctx.clearRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
 
-      const cols = 80;
-      const rows = 40;
+      const cols = 96;
+      const rows = 48;
       const cellW = width / cols;
       const cellH = height / rows;
 
@@ -68,16 +69,16 @@ export function CvStackedHeatmapCanvas({
         if (layer.points.length < 4) continue;
         const grid = new Float32Array(cols * rows);
         for (const p of layer.points) {
-          const cx = Math.min(cols - 1, Math.max(0, Math.floor(p.x * cols)));
-          const cy = Math.min(rows - 1, Math.max(0, Math.floor(p.y * rows)));
-          // Soft 3x3 splat
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
+          const px = cvNormToCanvas(p.x, p.y, width, height);
+          const cx = Math.min(cols - 1, Math.max(0, Math.floor(px.x / cellW)));
+          const cy = Math.min(rows - 1, Math.max(0, Math.floor(px.y / cellH)));
+          for (let dy = -2; dy <= 2; dy++) {
+            for (let dx = -2; dx <= 2; dx++) {
               const x = cx + dx;
               const y = cy + dy;
               if (x < 0 || y < 0 || x >= cols || y >= rows) continue;
-              const w = dx === 0 && dy === 0 ? 1 : 0.35;
-              grid[y * cols + x]! += w;
+              const dist = Math.hypot(dx, dy);
+              grid[y * cols + x]! += dist === 0 ? 1 : 0.45 / (1 + dist);
             }
           }
         }
@@ -88,26 +89,10 @@ export function CvStackedHeatmapCanvas({
         for (let y = 0; y < rows; y++) {
           for (let x = 0; x < cols; x++) {
             const v = grid[y * cols + x]! / max;
-            if (v < 0.08) continue;
-            ctx.fillStyle = `rgba(${r},${g},${b},${0.12 + v * 0.45})`;
+            if (v < 0.12) continue;
+            ctx.fillStyle = `rgba(${r},${g},${b},${0.1 + v * 0.5})`;
             ctx.fillRect(x * cellW, y * cellH, cellW + 0.5, cellH + 0.5);
           }
-        }
-
-        // Trail outline
-        if (layer.points.length >= 2) {
-          ctx.beginPath();
-          ctx.strokeStyle = layer.color;
-          ctx.globalAlpha = 0.75;
-          ctx.lineWidth = 2;
-          layer.points.forEach((p, i) => {
-            const px = p.x * width;
-            const py = p.y * height;
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-          });
-          ctx.stroke();
-          ctx.globalAlpha = 1;
         }
       }
     };

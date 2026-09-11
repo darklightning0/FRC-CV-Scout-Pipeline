@@ -1,6 +1,6 @@
 /**
  * Multi-layer CV trail on the Hunter Eyes field (absolute blue-left coords).
- * Supports phase colors, multi-match overlays, and a simple time scrubber.
+ * Y is flipped to match meter-space telemetry and Python heatmaps.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -10,6 +10,12 @@ import { Checkbox } from '@/core/components/ui/checkbox';
 import { Label } from '@/core/components/ui/label';
 import { Slider } from '@/core/components/ui/slider';
 import { cn } from '@/core/lib/utils';
+import {
+  BLUE_ALLIANCE_HUES,
+  RED_ALLIANCE_HUES,
+  cvNormToCanvas,
+  smoothCvPoints,
+} from '@/core/lib/cvFieldCoords';
 import type { CvFieldPoint } from '@/core/types/cv-telemetry';
 import { Pause, Play } from 'lucide-react';
 
@@ -18,22 +24,24 @@ export type CvTrailLayer = {
   label: string;
   color: string;
   points: CvFieldPoint[];
-  /** When false, drawn thinner / lower opacity */
   emphasis?: boolean;
+  /** Playback speed for this layer's time domain (1 = realtime, 2 = 2×) */
+  playbackRate?: number;
 };
 
 type CvTrailCanvasProps = {
   layers: CvTrailLayer[];
   className?: string;
-  /** Enable playhead scrubbing across all points with timeSec */
   enableReplay?: boolean;
   title?: string;
+  /** Default speed when layers don't set playbackRate */
+  defaultPlaybackRate?: number;
 };
 
 const PHASE_PRESETS = [
-  { id: 'auto', label: 'Auto', color: '#22d3ee' },
-  { id: 'teleop', label: 'Teleop', color: '#a78bfa' },
-  { id: 'endgame', label: 'Endgame', color: '#f59e0b' },
+  { id: 'auto', label: 'Auto', hueIndex: 0, playbackRate: 1 },
+  { id: 'teleop', label: 'Teleop', hueIndex: 1, playbackRate: 2 },
+  { id: 'endgame', label: 'Endgame', hueIndex: 2, playbackRate: 1 },
 ] as const;
 
 export function CvTrailCanvas({
@@ -41,6 +49,7 @@ export function CvTrailCanvas({
   className = '',
   enableReplay = true,
   title,
+  defaultPlaybackRate = 1,
 }: CvTrailCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -48,17 +57,28 @@ export function CvTrailCanvas({
     Object.fromEntries(layers.map((l) => [l.id, true]))
   );
   const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(1); // 0–1 of max time
+  const [timeSec, setTimeSec] = useState(0);
 
-  const maxTime = useMemo(() => {
+  const { minTime, maxTime, playbackRate } = useMemo(() => {
+    let min = Number.POSITIVE_INFINITY;
     let max = 0;
+    let rate = defaultPlaybackRate;
     for (const layer of layers) {
+      if (layer.playbackRate && layer.playbackRate > 0) rate = layer.playbackRate;
       for (const p of layer.points) {
+        if (p.timeSec < min) min = p.timeSec;
         if (p.timeSec > max) max = p.timeSec;
       }
     }
-    return Math.max(max, 1);
-  }, [layers]);
+    if (!Number.isFinite(min)) min = 0;
+    return { minTime: min, maxTime: Math.max(max, min + 1), playbackRate: rate };
+  }, [layers, defaultPlaybackRate]);
+
+  // Reset playhead when layers change
+  useEffect(() => {
+    setTimeSec(minTime);
+    setPlaying(false);
+  }, [minTime, maxTime]);
 
   useEffect(() => {
     setVisible((prev) => {
@@ -72,21 +92,24 @@ export function CvTrailCanvas({
 
   useEffect(() => {
     if (!playing) return;
-    const started = performance.now();
-    const startProgress = progress;
-    const durationMs = Math.max(4000, maxTime * 40);
     let raf = 0;
+    let last = performance.now();
     const tick = (now: number) => {
-      const t = Math.min(1, startProgress + (now - started) / durationMs);
-      setProgress(t);
-      if (t < 1) raf = requestAnimationFrame(tick);
-      else setPlaying(false);
+      const dt = (now - last) / 1000;
+      last = now;
+      setTimeSec((prev) => {
+        const next = prev + dt * playbackRate;
+        if (next >= maxTime) {
+          setPlaying(false);
+          return maxTime;
+        }
+        return next;
+      });
+      raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-    // intentionally not depending on progress — restart only when play toggled on
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, maxTime]);
+  }, [playing, playbackRate, maxTime]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -105,13 +128,12 @@ export function CvTrailCanvas({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
-    const cutoff = progress * maxTime;
-
     for (const layer of layers) {
       if (!visible[layer.id]) continue;
-      const pts = enableReplay
-        ? layer.points.filter((p) => p.timeSec <= cutoff + 0.01)
+      const raw = enableReplay
+        ? layer.points.filter((p) => p.timeSec <= timeSec + 0.01)
         : layer.points;
+      const pts = smoothCvPoints(raw, 5);
       if (pts.length < 1) continue;
 
       const thick = layer.emphasis === false ? 1.5 : 2.5;
@@ -123,29 +145,36 @@ export function CvTrailCanvas({
 
       if (pts.length >= 2) {
         ctx.beginPath();
-        ctx.moveTo(pts[0]!.x * width, pts[0]!.y * height);
+        const first = cvNormToCanvas(pts[0]!.x, pts[0]!.y, width, height);
+        ctx.moveTo(first.x, first.y);
         for (let i = 1; i < pts.length; i += 1) {
-          ctx.lineTo(pts[i]!.x * width, pts[i]!.y * height);
+          const p = cvNormToCanvas(pts[i]!.x, pts[i]!.y, width, height);
+          ctx.lineTo(p.x, p.y);
         }
         ctx.stroke();
       }
 
-      const last = pts[pts.length - 1]!;
+      const lastPt = pts[pts.length - 1]!;
+      const lastPx = cvNormToCanvas(lastPt.x, lastPt.y, width, height);
       ctx.globalAlpha = 1;
       ctx.fillStyle = layer.color;
       ctx.beginPath();
-      ctx.arc(last.x * width, last.y * height, layer.emphasis === false ? 3 : 5, 0, Math.PI * 2);
+      ctx.arc(lastPx.x, lastPx.y, layer.emphasis === false ? 3 : 5, 0, Math.PI * 2);
       ctx.fill();
       if (pts[0]) {
+        const startPx = cvNormToCanvas(pts[0].x, pts[0].y, width, height);
         ctx.beginPath();
-        ctx.arc(pts[0].x * width, pts[0].y * height, 4, 0, Math.PI * 2);
+        ctx.arc(startPx.x, startPx.y, 4, 0, Math.PI * 2);
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
     }
     ctx.globalAlpha = 1;
-  }, [layers, visible, progress, maxTime, enableReplay]);
+  }, [layers, visible, timeSec, enableReplay]);
+
+  const span = Math.max(0.001, maxTime - minTime);
+  const progress = Math.min(1, Math.max(0, (timeSec - minTime) / span));
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -185,7 +214,7 @@ export function CvTrailCanvas({
             variant="outline"
             className="shrink-0 gap-1"
             onClick={() => {
-              if (progress >= 0.999) setProgress(0);
+              if (timeSec >= maxTime - 0.05) setTimeSec(minTime);
               setPlaying((p) => !p);
             }}
           >
@@ -196,15 +225,16 @@ export function CvTrailCanvas({
             value={[progress]}
             min={0}
             max={1}
-            step={0.01}
+            step={0.001}
             onValueChange={(v) => {
               setPlaying(false);
-              setProgress(v[0] ?? 0);
+              setTimeSec(minTime + (v[0] ?? 0) * span);
             }}
             className="flex-1"
           />
-          <span className="w-14 text-right font-mono text-xs text-muted-foreground">
-            {(progress * maxTime).toFixed(0)}s
+          <span className="w-20 text-right font-mono text-xs text-muted-foreground">
+            {timeSec.toFixed(1)}s
+            {playbackRate !== 1 ? ` · ${playbackRate}×` : ''}
           </span>
         </div>
       )}
@@ -216,7 +246,9 @@ export function phaseLayersFromPaths(opts: {
   auto?: CvFieldPoint[];
   teleop?: CvFieldPoint[];
   endgame?: CvFieldPoint[];
+  alliance?: 'red' | 'blue' | 'unknown';
 }): CvTrailLayer[] {
+  const hues = opts.alliance === 'red' ? RED_ALLIANCE_HUES : BLUE_ALLIANCE_HUES;
   return PHASE_PRESETS.map((preset) => {
     const points =
       preset.id === 'auto'
@@ -227,9 +259,10 @@ export function phaseLayersFromPaths(opts: {
     return {
       id: preset.id,
       label: preset.label,
-      color: preset.color,
+      color: hues[preset.hueIndex]!,
       points,
       emphasis: true,
+      playbackRate: preset.playbackRate,
     };
   }).filter((l) => l.points.length > 0);
 }

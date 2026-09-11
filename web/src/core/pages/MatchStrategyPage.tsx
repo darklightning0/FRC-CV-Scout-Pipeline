@@ -141,12 +141,15 @@ const MatchStrategyPage = (props: MatchStrategyPageProps) => {
     const [showCvTrails, setShowCvTrails] = useState(true);
     const { entries: cvEntries } = useMatchCvTelemetry(selectedEvent, matchNumber, selectedTeams);
     const cvTrailLayers = useMemo((): CvOverlayTrail[] => {
-        const blueColors = ['#38bdf8', '#22d3ee', '#67e8f9'];
-        const redColors = ['#f87171', '#fb7185', '#f43f5e'];
+        const blueColors = ['#1e3a8a', '#2563eb', '#22d3ee'];
+        const redColors = ['#7f1d1d', '#dc2626', '#fb7185'];
         let bi = 0;
         let ri = 0;
         return cvEntries.map((e) => {
-            const isBlue = e.alliance === 'blue';
+            const slot = selectedTeams.indexOf(e.teamNumber);
+            const isBlue =
+                e.alliance === 'blue' ||
+                (e.alliance !== 'red' && slot >= 3);
             const color = isBlue
                 ? blueColors[bi++ % blueColors.length]!
                 : redColors[ri++ % redColors.length]!;
@@ -154,23 +157,23 @@ const MatchStrategyPage = (props: MatchStrategyPageProps) => {
                 activeTab === 'teleop'
                     ? e.teleopPath && e.teleopPath.length > 0
                         ? e.teleopPath
-                        : e.matchPath ?? e.autoPath
+                        : []
                     : activeTab === 'endgame'
                       ? e.endgamePath && e.endgamePath.length > 0
                           ? e.endgamePath
-                          : e.matchPath ?? e.autoPath
+                          : []
                       : e.autoPath.length > 0
                         ? e.autoPath
-                        : e.matchPath ?? [];
+                        : [];
             return {
                 id: `cv-${e.teamNumber}`,
                 color,
                 points: stagePoints,
                 lineWidth: 2.4,
-                alpha: 0.8,
+                alpha: 0.85,
             };
         });
-    }, [cvEntries, activeTab]);
+    }, [cvEntries, activeTab, selectedTeams]);
 
     const handleTeamChangeWithSpotDefaults = (index: number, teamNumber: number | null) => {
         handleTeamChange(index, teamNumber);

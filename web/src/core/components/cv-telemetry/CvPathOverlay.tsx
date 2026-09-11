@@ -58,7 +58,9 @@ export function CvPathOverlay({
     if (!scoutStart?.position || !cvStart) return null;
 
     const dxM = (scoutStart.position.x - cvStart.x) * FIELD_LENGTH_M;
-    const dyM = (scoutStart.position.y - cvStart.y) * FIELD_WIDTH_M;
+    // Scout paths are image-space (y=0 top); CV is meter-space (y=0 bottom)
+    const scoutYMeter = 1 - scoutStart.position.y;
+    const dyM = (scoutYMeter - cvStart.y) * FIELD_WIDTH_M;
     const distM = Math.round(Math.hypot(dxM, dyM) * 100) / 100;
 
     return {
@@ -89,16 +91,21 @@ export function CvPathOverlay({
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, height);
 
-    const toPx = (normX: number, normY: number) => {
+    const toPx = (normX: number, normY: number, flipY = false) => {
       const v = visualize(normX, normY, drawAlliance);
-      return { x: v.x * width, y: v.y * height };
+      return {
+        x: v.x * width,
+        // Scout paths are image-space (y=0 top). CV meter-space has y=0 at bottom.
+        y: flipY ? (1 - v.y) * height : v.y * height,
+      };
     };
 
     const drawPolyline = (
       points: { x: number; y: number }[],
       color: string,
       lineWidth: number,
-      dashed = false
+      dashed = false,
+      flipY = false
     ) => {
       if (points.length < 2) return;
       ctx.strokeStyle = color;
@@ -107,25 +114,25 @@ export function CvPathOverlay({
       ctx.lineCap = 'round';
       ctx.setLineDash(dashed ? [6, 4] : []);
       ctx.beginPath();
-      const first = toPx(points[0]!.x, points[0]!.y);
+      const first = toPx(points[0]!.x, points[0]!.y, flipY);
       ctx.moveTo(first.x, first.y);
       for (let i = 1; i < points.length; i += 1) {
-        const p = toPx(points[i]!.x, points[i]!.y);
+        const p = toPx(points[i]!.x, points[i]!.y, flipY);
         ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
       ctx.setLineDash([]);
     };
 
-    const drawDot = (x: number, y: number, color: string, radius: number) => {
-      const p = toPx(x, y);
+    const drawDot = (x: number, y: number, color: string, radius: number, flipY = false) => {
+      const p = toPx(x, y, flipY);
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
       ctx.fill();
     };
 
-    // Scout path (orange) — waypoint positions + pathPoints
+    // Scout path (orange) — waypoint positions + pathPoints (image-space Y)
     if (showScoutPath && scoutWaypoints.length > 0) {
       const scoutPoints: { x: number; y: number }[] = [];
       for (const wp of scoutWaypoints) {
@@ -135,26 +142,27 @@ export function CvPathOverlay({
           scoutPoints.push(wp.position);
         }
       }
-      drawPolyline(scoutPoints, 'rgba(249, 115, 22, 0.95)', 3);
+      drawPolyline(scoutPoints, 'rgba(249, 115, 22, 0.95)', 3, false, false);
       const start = scoutWaypoints.find((w) => w.type === 'start') || scoutWaypoints[0];
       if (start?.position) {
-        drawDot(start.position.x, start.position.y, '#f97316', 6);
+        drawDot(start.position.x, start.position.y, '#f97316', 6, false);
       }
     }
 
-    // CV path (cyan)
+    // CV path — meter-space Y (flip); alliance hue
     if (showCvPath && cvAutoPath.length > 0) {
-      drawPolyline(cvAutoPath, 'rgba(34, 211, 238, 0.95)', 3);
+      const cvColor = drawAlliance === 'red' ? '#dc2626' : '#2563eb';
+      drawPolyline(cvAutoPath, cvColor, 3, false, true);
       const start = cvAutoPath[0]!;
       const end = cvAutoPath[cvAutoPath.length - 1]!;
-      drawDot(start.x, start.y, '#22d3ee', 6);
-      drawDot(end.x, end.y, '#67e8f9', 4);
+      drawDot(start.x, start.y, cvColor, 6, true);
+      drawDot(end.x, end.y, cvColor, 4, true);
     }
 
     // Start delta
     if (showDelta && startDelta && showScoutPath && showCvPath) {
-      const p1 = toPx(startDelta.scoutPos.x, startDelta.scoutPos.y);
-      const p2 = toPx(startDelta.cvPos.x, startDelta.cvPos.y);
+      const p1 = toPx(startDelta.scoutPos.x, startDelta.scoutPos.y, false);
+      const p2 = toPx(startDelta.cvPos.x, startDelta.cvPos.y, true);
       ctx.strokeStyle = '#ec4899';
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 4]);

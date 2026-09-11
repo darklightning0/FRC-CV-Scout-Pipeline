@@ -813,10 +813,33 @@ export const restoreBackgroundWithOverlays = (
 export type CvOverlayTrail = {
   id: string;
   color: string;
-  points: Array<{ x: number; y: number }>;
+  points: Array<{ x: number; y: number; timeSec?: number }>;
   lineWidth?: number;
   alpha?: number;
 };
+
+function smoothOverlayPoints(
+  points: Array<{ x: number; y: number; timeSec?: number }>,
+  window = 5
+): Array<{ x: number; y: number; timeSec?: number }> {
+  if (points.length < 3 || window < 2) return points;
+  const half = Math.floor(window / 2);
+  const out: Array<{ x: number; y: number; timeSec?: number }> = [];
+  for (let i = 0; i < points.length; i += 1) {
+    let sx = 0;
+    let sy = 0;
+    let n = 0;
+    for (let j = i - half; j <= i + half; j += 1) {
+      const p = points[Math.max(0, Math.min(points.length - 1, j))]!;
+      sx += p.x;
+      sy += p.y;
+      n += 1;
+    }
+    const src = points[i]!;
+    out.push({ x: sx / n, y: sy / n, timeSec: src.timeSec });
+  }
+  return out;
+}
 
 export const drawCvTrailLayers = (
   ctx: CanvasRenderingContext2D,
@@ -827,7 +850,8 @@ export const drawCvTrailLayers = (
   if (!trails.length) return;
 
   for (const trail of trails) {
-    if (trail.points.length < 2) continue;
+    const points = smoothOverlayPoints(trail.points, 5);
+    if (points.length < 2) continue;
     ctx.save();
     ctx.globalAlpha = trail.alpha ?? 0.85;
     ctx.strokeStyle = trail.color;
@@ -835,18 +859,19 @@ export const drawCvTrailLayers = (
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
-    trail.points.forEach((point, index) => {
+    points.forEach((point, index) => {
+      // CV y=0 is field bottom; canvas y=0 is top — flip to match heatmaps
       const px = point.x * width;
-      const py = point.y * height;
+      const py = (1 - point.y) * height;
       if (index === 0) ctx.moveTo(px, py);
       else ctx.lineTo(px, py);
     });
     ctx.stroke();
 
-    const start = trail.points[0]!;
+    const start = points[0]!;
     ctx.fillStyle = trail.color;
     ctx.beginPath();
-    ctx.arc(start.x * width, start.y * height, 4, 0, Math.PI * 2);
+    ctx.arc(start.x * width, (1 - start.y) * height, 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
