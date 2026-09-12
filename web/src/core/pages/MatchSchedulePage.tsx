@@ -203,6 +203,9 @@ export default function MatchSchedulePage() {
     isLoading,
     isRefreshing,
     error,
+    isOnline,
+    dataSource,
+    cacheAgeLabel,
     refresh,
     persistEventKey,
   } = useMatchSchedule(eventKey);
@@ -241,7 +244,7 @@ export default function MatchSchedulePage() {
           <div>
             <h1 className="text-2xl font-bold">Match Schedule</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              TBA schedule, scores, cards/DQ, and who scouted each match.
+              Offline-first TBA schedule: uses downloaded cache, refreshes when online.
             </p>
           </div>
           <Button
@@ -249,7 +252,7 @@ export default function MatchSchedulePage() {
             size="sm"
             className="gap-2 shrink-0"
             onClick={() => void handleRefresh()}
-            disabled={!eventKey || isRefreshing || isLoading}
+            disabled={!eventKey || isRefreshing || isLoading || !isOnline}
           >
             <RefreshCw className={cn('h-4 w-4', (isRefreshing || isLoading) && 'animate-spin')} />
             {isRefreshing ? 'Refreshing…' : 'Refresh TBA'}
@@ -301,6 +304,21 @@ export default function MatchSchedulePage() {
               <Badge variant="outline">{rows.length} matches</Badge>
               <Badge variant="outline">{played} played</Badge>
               <Badge variant="outline">{scouted} with scouting</Badge>
+              {!isOnline && (
+                <Badge variant="outline" className="border-orange-500/40 text-orange-300">
+                  Offline
+                </Badge>
+              )}
+              {dataSource === 'cache' && (
+                <Badge variant="outline" className="border-sky-500/40 text-sky-300">
+                  Cached{cacheAgeLabel ? ` · ${cacheAgeLabel}` : ''}
+                </Badge>
+              )}
+              {dataSource === 'tba' && isOnline && (
+                <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
+                  Live TBA{cacheAgeLabel ? ` · ${cacheAgeLabel}` : ''}
+                </Badge>
+              )}
               {highlightNum != null && (
                 <Badge className="bg-amber-500/20 text-amber-200 border-amber-500/40">
                   Showing team {highlightNum}
@@ -316,8 +334,8 @@ export default function MatchSchedulePage() {
                     : `Matches for team ${filterTeam}`}
                 </CardTitle>
                 <CardDescription>
-                  Yellow / red squares = cards; ban icon = DQ. Scout names come from local scouting
-                  entries for this event.
+                  Yellow / red squares = cards; ban icon = DQ. Data is stored locally after download
+                  (same TBA cache as API Data). Scout names come from local scouting entries.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -326,7 +344,7 @@ export default function MatchSchedulePage() {
                 ) : filteredRows.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-8 text-center">
                     {rows.length === 0
-                      ? 'No TBA matches cached yet. Tap Refresh TBA (or load the event from API Data).'
+                      ? 'No schedule cached yet. Connect to the internet and tap Refresh TBA (or download the event from API Data → Match Schedules / Regional download).'
                       : 'No matches for that team filter.'}
                   </p>
                 ) : (

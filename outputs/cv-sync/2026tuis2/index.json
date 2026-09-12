@@ -1,6 +1,6 @@
 {
   "event_key": "2026tuis2",
-  "updated_at": "2026-09-12T13:36:28.799297+00:00",
+  "updated_at": "2026-09-12T13:44:50.997228+00:00",
   "matches": [
     {
       "match_key": "2026tuis2_qm1",
@@ -196,6 +196,19 @@
       ],
       "processed_at": "2026-09-12T13:36:12.240225+00:00",
       "bundle_path": "2026tuis2_qm15/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm16",
+      "teams": [
+        "10244",
+        "11255",
+        "5883",
+        "6431",
+        "7729",
+        "9468"
+      ],
+      "processed_at": "2026-09-12T13:44:37.952466+00:00",
+      "bundle_path": "2026tuis2_qm16/ai_scout_bundle.json"
     }
   ]
 }

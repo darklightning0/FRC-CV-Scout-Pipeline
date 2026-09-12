@@ -23,19 +23,19 @@ const dataTypeOptions = [
     value: 'match-data' as const,
     label: 'Match Schedules',
     icon: Database,
-    description: 'Download match schedules for scouting'
+    description: 'Download TBA schedule into local cache (works offline afterward; refreshes when online)'
   },
   {
     value: 'match-results' as const,
-    label: 'Match Results',
+    label: 'Match Results (scout stakes)',
     icon: Trophy,
-    description: 'Download actual match scores and winners'
+    description: 'Optional gamification: grades Game Start winner predictions and awards stakes. Not needed for schedule/scores — use Match Schedule or Match Validation Data instead'
   },
   {
     value: 'match-validation-data' as const,
     label: 'Match Validation Data',
     icon: CheckCircle,
-    description: 'Load TBA breakdowns and refresh TBA COPR + Statbotics EPA metrics'
+    description: 'Download full TBA match breakdowns into cache (scores, climbs, COPR) for validation & strategy'
   },
   {
     value: 'statbotics-epa' as const,

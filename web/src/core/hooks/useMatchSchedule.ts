@@ -3,7 +3,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getCachedTBAEventMatches, cacheTBAMatches } from '@/core/lib/tbaCache';
+import { getCachedTBAEventMatches, cacheTBAMatches, getCacheMetadata } from '@/core/lib/tbaCache';
 import { fetchTBAEventMatchesDetailed } from '@/core/lib/tbaMatchData';
 import type { TBAMatchData } from '@/core/lib/tbaMatchData';
 import {
@@ -13,6 +13,23 @@ import {
 } from '@/core/lib/tbaMatchResults';
 import { getEntriesByEvent } from '@/core/db/scoutingDatabase';
 import { setCurrentEvent } from '@/core/lib/tba/eventDataUtils';
+
+function sortMatches(tbaMatches: TBAMatchData[]): TBAMatchData[] {
+  return [...tbaMatches].sort((a, b) => {
+    const ka = matchSortKey(a);
+    const kb = matchSortKey(b);
+    return ka[0] - kb[0] || ka[1] - kb[1] || ka[2] - kb[2];
+  });
+}
+
+function formatCacheAge(timestamp: number): string {
+  const ageMinutes = Math.floor((Date.now() - timestamp) / (1000 * 60));
+  if (ageMinutes < 1) return 'just now';
+  if (ageMinutes < 60) return `${ageMinutes} min ago`;
+  const hours = Math.floor(ageMinutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 export type TeamCardKind = 'yellow' | 'red' | 'dq';
 
@@ -104,84 +121,138 @@ export function useMatchSchedule(eventKey: string) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filterTeam, setFilterTeam] = useState<string>('all');
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+  const [cacheUpdatedAt, setCacheUpdatedAt] = useState<number | null>(null);
+  const [dataSource, setDataSource] = useState<'cache' | 'tba' | 'none'>('none');
 
-  const load = useCallback(async (refreshFromTba: boolean) => {
-    const key = eventKey.trim().toLowerCase();
-    if (!key) {
-      setMatches([]);
-      setScoutByMatchNumber(new Map());
-      setError(null);
-      return;
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+
+  const loadScoutMap = useCallback(async (key: string, rawEventKey: string) => {
+    const rawEntries = [
+      ...(await getEntriesByEvent(key)),
+      ...(await getEntriesByEvent(rawEventKey.trim())),
+    ];
+    const seen = new Set<string>();
+    const entries = rawEntries.filter((e) => {
+      const id = String(
+        (e as { id?: string }).id || `${e.matchKey}-${e.teamNumber}-${e.scoutName}`
+      );
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+
+    const byMatch = new Map<number, { names: Set<string>; teams: Set<number> }>();
+    for (const entry of entries) {
+      const num = entry.matchNumber;
+      if (!Number.isFinite(num)) continue;
+      let bucket = byMatch.get(num);
+      if (!bucket) {
+        bucket = { names: new Set(), teams: new Set() };
+        byMatch.set(num, bucket);
+      }
+      if (entry.scoutName?.trim()) bucket.names.add(entry.scoutName.trim());
+      if (entry.teamNumber) bucket.teams.add(entry.teamNumber);
     }
+    setScoutByMatchNumber(byMatch);
+  }, []);
 
-    if (refreshFromTba) setIsRefreshing(true);
-    else setIsLoading(true);
-    setError(null);
+  const load = useCallback(
+    async (forceRefresh: boolean) => {
+      const key = eventKey.trim().toLowerCase();
+      if (!key) {
+        setMatches([]);
+        setScoutByMatchNumber(new Map());
+        setError(null);
+        setCacheUpdatedAt(null);
+        setDataSource('none');
+        return;
+      }
 
-    try {
-      let tbaMatches = await getCachedTBAEventMatches(key, true);
+      const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
+      setIsOnline(online);
 
-      if (refreshFromTba || tbaMatches.length === 0) {
-        try {
-          const fresh = await fetchTBAEventMatchesDetailed(key);
-          if (Array.isArray(fresh) && fresh.length > 0) {
-            await cacheTBAMatches(fresh);
-            tbaMatches = fresh;
-          }
-        } catch (fetchErr) {
-          if (tbaMatches.length === 0) {
-            throw fetchErr;
-          }
+      // 1) Always paint from IndexedDB cache first (works offline)
+      const cached = await getCachedTBAEventMatches(key, true);
+      const meta = await getCacheMetadata(key);
+      if (cached.length > 0) {
+        setMatches(sortMatches(cached));
+        setDataSource('cache');
+        setCacheUpdatedAt(meta?.lastFetchedAt ?? null);
+        setError(null);
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+      }
+
+      await loadScoutMap(key, eventKey);
+
+      const shouldFetch =
+        online && (forceRefresh || cached.length === 0 || Boolean(meta && Date.now() - meta.lastFetchedAt > 10 * 60 * 1000));
+
+      if (!shouldFetch) {
+        if (cached.length === 0 && !online) {
+          setError('No cached schedule for this event, and you are offline.');
+          setDataSource('none');
+        }
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
+      // 2) Background / forced TBA refresh — keep showing cache if refresh fails
+      if (forceRefresh || cached.length === 0) setIsRefreshing(true);
+      try {
+        const fresh = await fetchTBAEventMatchesDetailed(key);
+        if (Array.isArray(fresh) && fresh.length > 0) {
+          // Keep ALL matches (scheduled + played), not only score-breakdown rows
+          await cacheTBAMatches(fresh);
+          setMatches(sortMatches(fresh));
+          setDataSource('tba');
+          const nextMeta = await getCacheMetadata(key);
+          setCacheUpdatedAt(nextMeta?.lastFetchedAt ?? Date.now());
+          setError(null);
+        } else if (cached.length === 0) {
+          setError('TBA returned no matches for this event.');
+          setDataSource('none');
+        }
+      } catch (fetchErr) {
+        if (cached.length === 0) {
+          setError(fetchErr instanceof Error ? fetchErr.message : 'Failed to load schedule');
+          setDataSource('none');
+        } else {
+          // Offline-capable: keep cache, note stale refresh
           console.warn('[MatchSchedule] TBA refresh failed, using cache', fetchErr);
+          setDataSource('cache');
         }
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
-
-      tbaMatches = [...tbaMatches].sort((a, b) => {
-        const ka = matchSortKey(a);
-        const kb = matchSortKey(b);
-        return ka[0] - kb[0] || ka[1] - kb[1] || ka[2] - kb[2];
-      });
-
-      setMatches(tbaMatches);
-
-      const rawEntries = [
-        ...(await getEntriesByEvent(key)),
-        ...(await getEntriesByEvent(eventKey.trim())),
-      ];
-      // Dedupe by id if present
-      const seen = new Set<string>();
-      const entries = rawEntries.filter((e) => {
-        const id = String((e as { id?: string }).id || `${e.matchKey}-${e.teamNumber}-${e.scoutName}`);
-        if (seen.has(id)) return false;
-        seen.add(id);
-        return true;
-      });
-
-      const byMatch = new Map<number, { names: Set<string>; teams: Set<number> }>();
-      for (const entry of entries) {
-        const num = entry.matchNumber;
-        if (!Number.isFinite(num)) continue;
-        let bucket = byMatch.get(num);
-        if (!bucket) {
-          bucket = { names: new Set(), teams: new Set() };
-          byMatch.set(num, bucket);
-        }
-        if (entry.scoutName?.trim()) bucket.names.add(entry.scoutName.trim());
-        if (entry.teamNumber) bucket.teams.add(entry.teamNumber);
-      }
-      setScoutByMatchNumber(byMatch);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load schedule');
-      setMatches([]);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [eventKey]);
+    },
+    [eventKey, loadScoutMap]
+  );
 
   useEffect(() => {
     void load(false);
   }, [load]);
+
+  // When coming back online, quietly refresh
+  useEffect(() => {
+    if (!isOnline || !eventKey.trim()) return;
+    void load(false);
+  }, [isOnline]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows: MatchScheduleRow[] = useMemo(() => {
     return matches.map((match) => {
@@ -268,6 +339,9 @@ export function useMatchSchedule(eventKey: string) {
     isLoading,
     isRefreshing,
     error,
+    isOnline,
+    dataSource,
+    cacheAgeLabel: cacheUpdatedAt ? formatCacheAge(cacheUpdatedAt) : null,
     refresh: () => load(true),
     persistEventKey,
   };

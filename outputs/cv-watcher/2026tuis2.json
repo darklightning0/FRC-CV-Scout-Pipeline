@@ -79,6 +79,12 @@
       "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm15/ai_scout_bundle.json",
       "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
       "at": "2026-09-12T13:36:31.436199+00:00"
+    },
+    "2026tuis2_qm16": {
+      "youtube": "https://www.youtube.com/watch?v=NI6pQa0J5Yg",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm16/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "2026-09-12T13:44:52.587340+00:00"
     }
   },
   "failed": {}
