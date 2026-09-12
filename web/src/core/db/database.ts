@@ -93,19 +93,29 @@ db.on('versionchange', () => {
   db.close();
 });
 
-// Open databases and log any errors
-db.open().catch(error => {
-  console.error('Failed to open MatchScoutingDB:', error);
-});
-
-db.on('ready', () => {
-  console.log('MatchScoutingDB ready:', {
-    version: db.verno,
-    tables: db.tables.map(table => table.name),
+/** Resolves when MatchScoutingDB is open (schema upgrades applied). */
+export const matchScoutingDbReady: Promise<void> = db
+  .open()
+  .then(() => {
+    console.log('MatchScoutingDB ready:', {
+      version: db.verno,
+      tables: db.tables.map((table) => table.name),
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to open MatchScoutingDB:', error);
+    throw error;
   });
-});
 
-pitDB.open().catch(error => {
+export async function ensureMatchScoutingDbReady(): Promise<void> {
+  await matchScoutingDbReady;
+  // If an older tab closed the connection, reopen.
+  if (!db.isOpen()) {
+    await db.open();
+  }
+}
+
+pitDB.open().catch((error) => {
   console.error('Failed to open PitScoutingDB:', error);
 });
 
@@ -119,13 +129,19 @@ pitDB.open().catch(error => {
 export const saveScoutingEntry = async <TGameData = Record<string, unknown>>(
   entry: ScoutingEntryBase<TGameData>
 ): Promise<void> => {
+  await ensureMatchScoutingDbReady();
   const existingEntry = await db.scoutingData.get(entry.id);
   await db.scoutingData.put(entry as ScoutingEntryBase<Record<string, unknown>>);
-  const { applyScoutingEntryUpsertToStrategySnapshots } = await import('@/core/lib/strategySnapshotCache');
-  await applyScoutingEntryUpsertToStrategySnapshots(
-    entry as ScoutingEntryBase<Record<string, unknown>>,
-    existingEntry
-  );
+  try {
+    const { applyScoutingEntryUpsertToStrategySnapshots } = await import('@/core/lib/strategySnapshotCache');
+    await applyScoutingEntryUpsertToStrategySnapshots(
+      entry as ScoutingEntryBase<Record<string, unknown>>,
+      existingEntry
+    );
+  } catch (strategyError) {
+    // Scout save must not fail if strategy cache tables are mid-upgrade / missing.
+    console.warn('[saveScoutingEntry] Strategy snapshot update skipped:', strategyError);
+  }
 };
 
 /**
@@ -134,13 +150,18 @@ export const saveScoutingEntry = async <TGameData = Record<string, unknown>>(
 export const saveScoutingEntries = async <TGameData = Record<string, unknown>>(
   entries: ScoutingEntryBase<TGameData>[]
 ): Promise<void> => {
+  await ensureMatchScoutingDbReady();
   const existingEntries = await db.scoutingData.bulkGet(entries.map(entry => entry.id));
   await db.scoutingData.bulkPut(entries as ScoutingEntryBase<Record<string, unknown>>[]);
-  const { applyScoutingEntriesUpsertToStrategySnapshots } = await import('@/core/lib/strategySnapshotCache');
-  await applyScoutingEntriesUpsertToStrategySnapshots(
-    entries as ScoutingEntryBase<Record<string, unknown>>[],
-    existingEntries.filter((entry): entry is ScoutingEntryBase<Record<string, unknown>> => !!entry)
-  );
+  try {
+    const { applyScoutingEntriesUpsertToStrategySnapshots } = await import('@/core/lib/strategySnapshotCache');
+    await applyScoutingEntriesUpsertToStrategySnapshots(
+      entries as ScoutingEntryBase<Record<string, unknown>>[],
+      existingEntries.filter((entry): entry is ScoutingEntryBase<Record<string, unknown>> => !!entry)
+    );
+  } catch (strategyError) {
+    console.warn('[saveScoutingEntries] Strategy snapshot update skipped:', strategyError);
+  }
 };
 
 /**

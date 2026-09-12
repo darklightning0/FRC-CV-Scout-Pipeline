@@ -118,7 +118,7 @@ export interface GameData {
         accuracyFew?: boolean;
         accuracyLittle?: boolean;
         
-        // Corral usage
+        // Outpost usage
         usedCorral?: boolean;
         
         [key: string]: unknown;

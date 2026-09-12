@@ -319,11 +319,11 @@ export const toggles = {
             group: "accuracy",
         },
 
-        // Corral usage (independent)
+        // Outpost (corral) usage (independent)
         usedCorral: {
-            label: "Used Corral",
-            description: "Robot put fuel into the Corral",
-            group: "Corral",
+            label: "Used Outpost",
+            description: "Robot put fuel into the Outpost",
+            group: "Outpost",
         },
     },
 } as const;

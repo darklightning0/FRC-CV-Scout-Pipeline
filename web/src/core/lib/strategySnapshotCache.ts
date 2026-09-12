@@ -1,6 +1,6 @@
 import { calculateTeamStats } from "@/game-template/calculations";
 import type { ScoutingEntry } from "@/game-template/scoring";
-import { db } from "@/core/db/database";
+import { db, ensureMatchScoutingDbReady } from "@/core/db/database";
 import type { ScoutingEntryBase } from "@/core/types/scouting-entry";
 import {
     STRATEGY_SNAPSHOT_CACHE_VERSION,
@@ -15,6 +15,11 @@ type StrategyKey = {
 };
 
 const toSnapshotId = (teamNumber: number, eventKey: string): string => `${teamNumber}::${eventKey}`;
+
+const hasStrategyCacheStores = (): boolean => {
+    const names = new Set(db.tables.map((table) => table.name));
+    return names.has("strategySnapshots") && names.has("strategyCacheMetadata");
+};
 
 const normalizeEventKey = (eventKey: string): string => eventKey.toLowerCase().trim();
 
@@ -91,6 +96,12 @@ const recomputeKey = async ({ teamNumber, eventKey }: StrategyKey): Promise<void
 };
 
 export const rebuildStrategySnapshots = async (): Promise<void> => {
+    await ensureMatchScoutingDbReady();
+    if (!hasStrategyCacheStores()) {
+        console.warn("[strategySnapshotCache] strategy stores missing; skip rebuild");
+        return;
+    }
+
     const entries = await db.scoutingData.toArray() as ScoutingEntry[];
     const grouped = new Map<string, { teamNumber: number; eventKey: string; entries: ScoutingEntry[] }>();
 
@@ -128,6 +139,12 @@ export const rebuildStrategySnapshots = async (): Promise<void> => {
 };
 
 export const ensureStrategySnapshotsCurrent = async (): Promise<void> => {
+    await ensureMatchScoutingDbReady();
+    if (!hasStrategyCacheStores()) {
+        console.warn("[strategySnapshotCache] strategy stores missing; skip ensure");
+        return;
+    }
+
     const [metadata, entryCount, snapshotCount] = await Promise.all([
         db.strategyCacheMetadata.get(STRATEGY_SNAPSHOT_METADATA_ID),
         db.scoutingData.count(),
@@ -145,6 +162,9 @@ export const ensureStrategySnapshotsCurrent = async (): Promise<void> => {
 
 export const getStrategySnapshots = async (eventKey?: string): Promise<StrategySnapshot[]> => {
     await ensureStrategySnapshotsCurrent();
+    if (!hasStrategyCacheStores()) {
+        return [];
+    }
 
     if (eventKey) {
         return await db.strategySnapshots.where("eventKey").equals(normalizeEventKey(eventKey)).toArray();
@@ -157,6 +177,12 @@ export const applyScoutingEntryUpsertToStrategySnapshots = async (
     entry: ScoutingEntryBase,
     previousEntry?: ScoutingEntryBase
 ): Promise<void> => {
+    await ensureMatchScoutingDbReady();
+    if (!hasStrategyCacheStores()) {
+        console.warn("[strategySnapshotCache] strategy stores missing; skipping upsert");
+        return;
+    }
+
     const keys = uniqueStrategyKeys(
         [entry, previousEntry]
             .filter((candidate): candidate is ScoutingEntryBase => !!candidate)
@@ -181,6 +207,12 @@ export const applyScoutingEntriesUpsertToStrategySnapshots = async (
     entries: ScoutingEntryBase[],
     previousEntries: ScoutingEntryBase[] = []
 ): Promise<void> => {
+    await ensureMatchScoutingDbReady();
+    if (!hasStrategyCacheStores()) {
+        console.warn("[strategySnapshotCache] strategy stores missing; skipping bulk upsert");
+        return;
+    }
+
     const keys = uniqueStrategyKeys(
         [...entries, ...previousEntries]
             .map(entry => toStrategyKey(entry))
@@ -201,6 +233,11 @@ export const applyScoutingEntriesUpsertToStrategySnapshots = async (
 };
 
 export const applyScoutingEntryDeleteToStrategySnapshots = async (entry: ScoutingEntryBase): Promise<void> => {
+    await ensureMatchScoutingDbReady();
+    if (!hasStrategyCacheStores()) {
+        return;
+    }
+
     const key = toStrategyKey(entry);
     if (!key) {
         return;

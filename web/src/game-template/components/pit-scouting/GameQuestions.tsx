@@ -305,7 +305,7 @@ export function GameSpecificQuestions({ gameData = {}, onGameDataChange }: GameS
               onClick={() => handleChange('canPassToCorral', !gameData.canPassToCorral)}
               className="flex-1"
             >
-              Can pass fuel to corral
+              Can pass fuel to outpost
             </Button>
           </div>
         </CardContent>
