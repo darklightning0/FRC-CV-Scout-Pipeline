@@ -68,24 +68,15 @@ def _team_xy(telemetry: dict, team_id: str) -> tuple[np.ndarray, np.ndarray] | N
     history = telemetry.get("teams", {}).get(team_id, [])
     if not history:
         return None
-
-    # Prefer FPS from telemetry meta; fall back to 60
-    fps = float(telemetry.get("fps") or telemetry.get("video_fps") or 60.0)
-    try:
-        from trajectory_clean import clean_team_records
-        history = clean_team_records(history, fps=fps)
-    except Exception:
-        pass
-
     x_coords = [
         float(np.clip(p["x_m"], 0.0, FIELD_LENGTH_M))
         for p in history
-        if p.get("x_m", 0) >= 0 and p.get("y_m", 0) >= 0
+        if p.get("x_m", 0) > 0 and p.get("y_m", 0) > 0
     ]
     y_coords = [
         float(np.clip(p["y_m"], 0.0, FIELD_WIDTH_M))
         for p in history
-        if p.get("x_m", 0) >= 0 and p.get("y_m", 0) >= 0
+        if p.get("x_m", 0) > 0 and p.get("y_m", 0) > 0
     ]
     if len(x_coords) < 10:
         return None
@@ -147,9 +138,20 @@ def generate_team_heatmap(telemetry: dict, team_id: str, output_path: Path):
     blended = region * (1.0 - alpha[:, :, None]) + heat_color.astype(np.float32) * alpha[:, :, None]
     canvas[y1:y2, x1:x2] = np.clip(blended, 0, 255).astype(np.uint8)
 
-    # No cyan polyline — connecting jittery detections reads as a "child scribble"
-    # and cuts through field objects. KDE density is the accurate signal; trails
-    # live in the app canvases (already teleport-filtered + smoothed).
+    step = max(1, len(x) // 1500)
+    pts = np.array(
+        [field_to_px(float(xx), float(yy)) for xx, yy in zip(x[::step], y[::step])],
+        dtype=np.int32,
+    )
+    if len(pts) >= 2:
+        cv2.polylines(
+            canvas,
+            [pts],
+            isClosed=False,
+            color=(238, 211, 34),
+            thickness=2,
+            lineType=cv2.LINE_AA,
+        )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(output_path), canvas)
@@ -186,6 +188,21 @@ def generate_alliance_heatmap(
         heat_u8 = _kde_heat_u8(x, y, roi_w, roi_h)
         color = colors_bgr[idx % len(colors_bgr)]
         _blend_colored_heat(canvas, heat_u8, color, alpha_scale=0.48)
+
+        step = max(1, len(x) // 1200)
+        pts = np.array(
+            [field_to_px(float(xx), float(yy)) for xx, yy in zip(x[::step], y[::step])],
+            dtype=np.int32,
+        )
+        if len(pts) >= 2:
+            cv2.polylines(
+                canvas,
+                [pts],
+                isClosed=False,
+                color=color,
+                thickness=2,
+                lineType=cv2.LINE_AA,
+            )
         drawn += 1
 
     if drawn == 0:

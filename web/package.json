@@ -15,7 +15,7 @@
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "clean": "rimraf dist",
-    "dev:netlify": "netlify dev"
+    "dev:netlify": "npx --yes netlify-cli@17 dev"
   },
   "keywords": [
     "frc",
@@ -110,7 +110,6 @@
     "eslint-plugin-react-refresh": "^0.4.14",
     "globals": "^15.12.0",
     "knip": "^5.80.2",
-    "netlify-cli": "^17.38.1",
     "prettier": "^3.3.3",
     "rimraf": "^6.0.1",
     "tailwindcss": "^4.0.0-beta.6",
