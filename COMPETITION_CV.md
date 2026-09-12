@@ -12,12 +12,23 @@ Scouts never run YOLO. Analysis is laptop/batch after YouTube upload. CV lives i
 
 ## 1. Deploy Hunter Eyes + cloud CV API (Goal 1)
 
-1. Deploy the `web/` app to Netlify (GitHub or Netlify UI). Local `netlify-cli` may fail on Node 26 — use UI/Git if needed.
-2. In Netlify → Site settings → Environment variables, set:
-   - `CV_SYNC_API_KEY` = a long shared secret (same value on the laptop)
+1. Deploy the `web/` app to **Cloudflare Pages** (build: `npm run build`, output `dist`, root `web/`).
+2. In Cloudflare Pages → Settings:
+   - **Environment variables:** `CV_SYNC_API_KEY` = a long shared secret (same value on the laptop). Also set `TBA_API_KEY` / `NEXUS_API_KEY` for the TBA proxy.
+   - **Functions → KV namespace bindings:** create/bind a KV namespace with variable name **`CV_TELEMETRY`** (required for CV sync storage).
 3. After deploy, sanity-check:
-   - `https://YOUR-SITE.netlify.app/.netlify/functions/cv-api?action=health`
-   - Expect `{ "ok": true, ... }`
+   - `https://YOUR-PAGES-DOMAIN/cv-api?action=health`
+   - Expect `{ "ok": true, "service": "robotdetector-cv-api-cloudflare", "kv_bound": true, ... }`
+
+### Analyst laptop — point watcher at Cloudflare
+
+```bash
+export CV_SYNC_API_URL='https://YOUR-PAGES-DOMAIN/cv-api'
+export CV_SYNC_API_KEY='same-as-pages-env'
+python src/cv_event_watcher.py --event-key YOUR_EVENT
+```
+
+(Netlify still works if you host there: `…/.netlify/functions/cv-api` + Netlify Blobs.)
 
 ## 2. Analyst laptop — one watcher process
 
@@ -26,8 +37,8 @@ cd /path/to/RobotDetector
 source .venv/bin/activate   # or your venv
 
 export TBA_AUTH_KEY='…'
-export CV_SYNC_API_URL='https://YOUR-SITE.netlify.app/.netlify/functions/cv-api'
-export CV_SYNC_API_KEY='same-as-netlify-env'
+export CV_SYNC_API_URL='https://YOUR-PAGES-DOMAIN/cv-api'
+export CV_SYNC_API_KEY='same-as-pages-env'
 # optional if downloads 403:
 # export YTDLP_BROWSER=chrome
 
@@ -77,8 +88,8 @@ Then re-run the watcher, or publish the bundle from `outputs/.../ai_scout_bundle
 
 ## 5. Day-of checklist
 
-- [ ] Netlify site live; `?action=health` OK
-- [ ] `CV_SYNC_API_KEY` set on Netlify **and** laptop
+- [ ] Pages site live; `/cv-api?action=health` OK with `kv_bound: true`
+- [ ] `CV_SYNC_API_KEY` set on Pages **and** laptop; KV bound as `CV_TELEMETRY`
 - [ ] TBA key works (`event` matches Hunter Eyes event code)
 - [ ] `ffmpeg` + updated `yt-dlp` on laptop
 - [ ] Watcher running with correct `--event-key`

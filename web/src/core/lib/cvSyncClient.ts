@@ -1,7 +1,7 @@
 /**
  * Pull AI scout bundles into Dexie (TBA-style poll).
  *
- * Default: same-origin Netlify function (scouts only need Wi‑Fi + open Hunter Eyes).
+ * Default: same-origin /cv-api (Cloudflare Pages), then Netlify /.netlify/functions/cv-api.
  * Optional override: local sync server / tunnel URL in localStorage or VITE_CV_API_URL.
  */
 
@@ -39,16 +39,27 @@ function normalizeBase(url: string): string {
   return url.trim().replace(/\/$/, '');
 }
 
-/** True when talking to /.netlify/functions/cv-api (query-param API). */
+/** Query-param CV APIs: Cloudflare `/cv-api` or Netlify `/.netlify/functions/cv-api`. */
+export function isQueryParamCvApi(baseUrl: string): boolean {
+  const base = normalizeBase(baseUrl);
+  return /\/cv-api$/i.test(base) || /\/\.netlify\/functions\/cv-api$/i.test(base);
+}
+
+/** @deprecated Prefer isQueryParamCvApi — kept for older UI checks. */
 export function isNetlifyCvFunctionBase(baseUrl: string): boolean {
-  return /\/\.netlify\/functions\/cv-api\/?$/i.test(normalizeBase(baseUrl));
+  return isQueryParamCvApi(baseUrl);
+}
+
+export function getBuiltinCvApiCandidates(): string[] {
+  const origin =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : 'http://127.0.0.1:8888';
+  return [`${origin}/cv-api`, `${origin}/.netlify/functions/cv-api`];
 }
 
 export function getBuiltinCvApiBaseUrl(): string {
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return `${window.location.origin}/.netlify/functions/cv-api`;
-  }
-  return 'http://127.0.0.1:8888/.netlify/functions/cv-api';
+  return getBuiltinCvApiCandidates()[0]!;
 }
 
 function envDefaultApiUrl(): string {
@@ -57,7 +68,19 @@ function envDefaultApiUrl(): string {
 
 export function getStoredCvSyncBaseUrl(): string {
   const stored = localStorage.getItem(CV_SYNC_URL_KEY)?.trim();
-  if (stored) return stored;
+  if (stored) {
+    // Migrate old Netlify default on Cloudflare hosts to /cv-api
+    if (
+      typeof window !== 'undefined' &&
+      window.location?.origin &&
+      stored === `${window.location.origin}/.netlify/functions/cv-api`
+    ) {
+      const next = `${window.location.origin}/cv-api`;
+      localStorage.setItem(CV_SYNC_URL_KEY, next);
+      return next;
+    }
+    return stored;
+  }
   const fromEnv = envDefaultApiUrl();
   if (fromEnv) return fromEnv;
   return getBuiltinCvApiBaseUrl();
@@ -71,20 +94,64 @@ export function clearStoredCvSyncBaseUrl(): void {
   localStorage.removeItem(CV_SYNC_URL_KEY);
 }
 
+async function parseJsonResponse(res: Response, label: string): Promise<unknown> {
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (!trimmed) return {};
+  if (trimmed.startsWith('<!') || trimmed.startsWith('<html')) {
+    throw new Error(
+      `${label}: got HTML instead of JSON (is /cv-api deployed? On Cloudflare, bind KV as CV_TELEMETRY and set CV_SYNC_API_KEY).`
+    );
+  }
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    throw new Error(`${label}: invalid JSON (${trimmed.slice(0, 80)}…)`);
+  }
+}
+
 export async function fetchCvSyncHealth(baseUrl: string): Promise<boolean> {
   const base = normalizeBase(baseUrl);
-  const url = isNetlifyCvFunctionBase(base)
-    ? `${base}?action=health`
-    : `${base}/health`;
+  const url = isQueryParamCvApi(base) ? `${base}?action=health` : `${base}/health`;
   const res = await fetch(url, { method: 'GET' });
   if (!res.ok) return false;
-  const data = (await res.json()) as { ok?: boolean };
-  return data.ok === true;
+  try {
+    const data = (await parseJsonResponse(res, 'CV health')) as { ok?: boolean };
+    return data.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Prefer a live same-origin CV API when the stored URL is dead HTML. */
+export async function resolveWorkingCvSyncBaseUrl(preferred?: string): Promise<string> {
+  const candidates = [
+    preferred?.trim(),
+    getStoredCvSyncBaseUrl(),
+    ...getBuiltinCvApiCandidates(),
+    envDefaultApiUrl(),
+  ].filter((u): u is string => Boolean(u));
+
+  const seen = new Set<string>();
+  for (const raw of candidates) {
+    const base = normalizeBase(raw);
+    if (seen.has(base)) continue;
+    seen.add(base);
+    try {
+      if (await fetchCvSyncHealth(base)) {
+        setStoredCvSyncBaseUrl(base);
+        return base;
+      }
+    } catch {
+      /* try next */
+    }
+  }
+  return normalizeBase(preferred || getStoredCvSyncBaseUrl() || getBuiltinCvApiBaseUrl());
 }
 
 export async function fetchCvSyncIndex(baseUrl: string, eventKey: string): Promise<CvSyncIndex> {
   const base = normalizeBase(baseUrl);
-  const url = isNetlifyCvFunctionBase(base)
+  const url = isQueryParamCvApi(base)
     ? `${base}?action=index&event=${encodeURIComponent(eventKey)}`
     : `${base}/api/cv/index?event=${encodeURIComponent(eventKey)}`;
 
@@ -95,7 +162,7 @@ export async function fetchCvSyncIndex(baseUrl: string, eventKey: string): Promi
   if (!res.ok) {
     throw new Error(`CV sync index failed (${res.status})`);
   }
-  return (await res.json()) as CvSyncIndex;
+  return (await parseJsonResponse(res, 'CV index')) as CvSyncIndex;
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
@@ -113,7 +180,7 @@ async function fetchAndStoreHeatmap(
   matchKey: string,
   teamNumber: number
 ): Promise<void> {
-  const url = isNetlifyCvFunctionBase(base)
+  const url = isQueryParamCvApi(base)
     ? `${base}?action=heatmap&event=${encodeURIComponent(eventKey)}&match=${encodeURIComponent(matchKey)}&team=${teamNumber}`
     : `${base}/api/cv/heatmap/${encodeURIComponent(eventKey)}/${encodeURIComponent(matchKey)}/${teamNumber}`;
 
@@ -134,7 +201,14 @@ export async function pullCvBundlesForEvent(
   baseUrl: string,
   eventKey: string
 ): Promise<CvSyncPullResult> {
-  const base = normalizeBase(baseUrl);
+  const base = await resolveWorkingCvSyncBaseUrl(baseUrl);
+  const healthy = await fetchCvSyncHealth(base);
+  if (!healthy) {
+    throw new Error(
+      `Could not reach CV API at ${base}. On Cloudflare Pages: deploy /cv-api, bind KV as CV_TELEMETRY, and set CV_SYNC_API_KEY. Point the watcher at https://YOUR-DOMAIN/cv-api`
+    );
+  }
+
   const index = await fetchCvSyncIndex(base, eventKey);
   const matchKeys: string[] = [];
   let importedTeams = 0;
@@ -143,17 +217,22 @@ export async function pullCvBundlesForEvent(
     const matchKey = match.match_key;
     if (!matchKey) continue;
 
-    const bundleUrl = isNetlifyCvFunctionBase(base)
+    const bundleUrl = isQueryParamCvApi(base)
       ? `${base}?action=bundle&event=${encodeURIComponent(eventKey)}&match=${encodeURIComponent(matchKey)}`
       : `${base}/api/cv/bundle/${encodeURIComponent(eventKey)}/${encodeURIComponent(matchKey)}`;
 
     const res = await fetch(bundleUrl);
     if (!res.ok) continue;
 
-    const json = (await res.json()) as unknown;
-    if (!isAiScoutBundle(json)) continue;
+    let raw: unknown;
+    try {
+      raw = await parseJsonResponse(res, `CV bundle ${matchKey}`);
+    } catch {
+      continue;
+    }
+    if (!isAiScoutBundle(raw)) continue;
 
-    const bundle = json as AiScoutBundle;
+    const bundle = raw as AiScoutBundle;
     const entries = adaptAiScoutBundle(bundle);
     if (entries.length === 0) continue;
 

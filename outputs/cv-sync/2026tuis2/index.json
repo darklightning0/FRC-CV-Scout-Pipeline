@@ -1,6 +1,6 @@
 {
   "event_key": "2026tuis2",
-  "updated_at": "2026-09-11T17:35:37.135389+00:00",
+  "updated_at": "2026-09-12T10:50:40.161598+00:00",
   "matches": [
     {
       "match_key": "2026tuis2_qm1",
@@ -14,6 +14,32 @@
       ],
       "processed_at": "2026-09-11T17:35:21.990570+00:00",
       "bundle_path": "2026tuis2_qm1/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm2",
+      "teams": [
+        "10261",
+        "6417",
+        "6988",
+        "7672",
+        "7729",
+        "9427"
+      ],
+      "processed_at": "2026-09-12T10:41:35.969417+00:00",
+      "bundle_path": "2026tuis2_qm2/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm3",
+      "teams": [
+        "10213",
+        "11166",
+        "5665",
+        "8725",
+        "9001",
+        "9583"
+      ],
+      "processed_at": "2026-09-12T10:50:23.791546+00:00",
+      "bundle_path": "2026tuis2_qm3/ai_scout_bundle.json"
     }
   ]
 }

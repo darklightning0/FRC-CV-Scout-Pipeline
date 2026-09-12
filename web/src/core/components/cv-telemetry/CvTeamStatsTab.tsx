@@ -295,7 +295,7 @@ export function CvTeamStatsTab({
               onClick={() => {
                 clearStoredCvSyncBaseUrl();
                 setSyncBaseUrl(getBuiltinCvApiBaseUrl());
-                toast.info('Reset to Hunter Eyes cloud CV API');
+                toast.info('Reset to app default CV API (/cv-api)');
               }}
             >
               Use app default
@@ -312,13 +312,13 @@ export function CvTeamStatsTab({
               className="font-mono text-xs"
             />
             <p className="leading-relaxed">
-              On the analysis laptop (after Netlify deploy), one command is enough for scouts
-              worldwide:
+              On Cloudflare Pages: bind KV as <code>CV_TELEMETRY</code>, set{' '}
+              <code>CV_SYNC_API_KEY</code>, then on the analysis laptop:
               <br />
               <code className="select-all break-all">
-                export CV_SYNC_API_URL=&apos;https://YOUR-SITE.netlify.app/.netlify/functions/cv-api&apos;
+                export CV_SYNC_API_URL=&apos;https://YOUR-PAGES-DOMAIN/cv-api&apos;
                 <br />
-                export CV_SYNC_API_KEY=&apos;same-as-netlify-env&apos;
+                export CV_SYNC_API_KEY=&apos;same-as-pages-env&apos;
                 <br />
                 python src/cv_event_watcher.py --event-key{' '}
                 {eventForSync || 'YOUR_EVENT'}
