@@ -1,0 +1,201 @@
+{
+  "event_key": "2026tuis2",
+  "updated_at": "2026-09-12T13:36:28.799297+00:00",
+  "matches": [
+    {
+      "match_key": "2026tuis2_qm1",
+      "teams": [
+        "10914",
+        "11401",
+        "6948",
+        "7632",
+        "9079",
+        "9610"
+      ],
+      "processed_at": "2026-09-12T11:24:07.605865+00:00",
+      "bundle_path": "2026tuis2_qm1/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm2",
+      "teams": [
+        "10261",
+        "6417",
+        "6988",
+        "7672",
+        "7729",
+        "9427"
+      ],
+      "processed_at": "2026-09-12T11:31:53.124001+00:00",
+      "bundle_path": "2026tuis2_qm2/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm3",
+      "teams": [
+        "10213",
+        "11166",
+        "5665",
+        "8725",
+        "9001",
+        "9583"
+      ],
+      "processed_at": "2026-09-12T11:40:47.281221+00:00",
+      "bundle_path": "2026tuis2_qm3/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm4",
+      "teams": [
+        "10244",
+        "11095",
+        "5773",
+        "6838",
+        "9441",
+        "9468"
+      ],
+      "processed_at": "2026-09-12T11:49:07.163138+00:00",
+      "bundle_path": "2026tuis2_qm4/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm5",
+      "teams": [
+        "10428",
+        "11164",
+        "11266",
+        "11365",
+        "5883",
+        "8169"
+      ],
+      "processed_at": "2026-09-12T11:58:15.726380+00:00",
+      "bundle_path": "2026tuis2_qm5/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm6",
+      "teams": [
+        "10920",
+        "11255",
+        "6431",
+        "6948",
+        "6988",
+        "9001"
+      ],
+      "processed_at": "2026-09-12T12:08:05.811343+00:00",
+      "bundle_path": "2026tuis2_qm6/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm7",
+      "teams": [
+        "10244",
+        "11401",
+        "5773",
+        "7632",
+        "8725",
+        "9441"
+      ],
+      "processed_at": "2026-09-12T12:16:50.938289+00:00",
+      "bundle_path": "2026tuis2_qm7/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm8",
+      "teams": [
+        "10428",
+        "11166",
+        "5665",
+        "6838",
+        "7729",
+        "9610"
+      ],
+      "processed_at": "2026-09-12T12:25:04.195666+00:00",
+      "bundle_path": "2026tuis2_qm8/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm9",
+      "teams": [
+        "11266",
+        "11365",
+        "6417",
+        "6431",
+        "7672",
+        "9583"
+      ],
+      "processed_at": "2026-09-12T12:34:18.389507+00:00",
+      "bundle_path": "2026tuis2_qm9/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm10",
+      "teams": [
+        "10914",
+        "11095",
+        "11255",
+        "5883",
+        "8169",
+        "9427"
+      ],
+      "processed_at": "2026-09-12T12:43:20.224538+00:00",
+      "bundle_path": "2026tuis2_qm10/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm11",
+      "teams": [
+        "10213",
+        "10261",
+        "10920",
+        "11164",
+        "9079",
+        "9468"
+      ],
+      "processed_at": "2026-09-12T12:52:29.162454+00:00",
+      "bundle_path": "2026tuis2_qm11/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm12",
+      "teams": [
+        "10428",
+        "11166",
+        "11365",
+        "7672",
+        "8725",
+        "9001"
+      ],
+      "processed_at": "2026-09-12T13:10:45.829573+00:00",
+      "bundle_path": "2026tuis2_qm12/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm13",
+      "teams": [
+        "11095",
+        "11401",
+        "5665",
+        "5773",
+        "6988",
+        "8169"
+      ],
+      "processed_at": "2026-09-12T13:19:26.161771+00:00",
+      "bundle_path": "2026tuis2_qm13/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm14",
+      "teams": [
+        "10914",
+        "11164",
+        "6417",
+        "9079",
+        "9441",
+        "9610"
+      ],
+      "processed_at": "2026-09-12T13:27:37.950083+00:00",
+      "bundle_path": "2026tuis2_qm14/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm15",
+      "teams": [
+        "10213",
+        "10920",
+        "6948",
+        "7632",
+        "9427",
+        "9583"
+      ],
+      "processed_at": "2026-09-12T13:36:12.240225+00:00",
+      "bundle_path": "2026tuis2_qm15/ai_scout_bundle.json"
+    }
+  ]
+}

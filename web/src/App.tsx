@@ -44,6 +44,7 @@ import PickListPage from "@/core/pages/PickListPage";
 import ScoutManagementDashboardPage from "@/core/pages/ScoutManagementDashboardPage";
 import AchievementsPage from "@/core/pages/AchievementsPage";
 import DevUtilitiesPage from "@/core/pages/DevUtilitiesPage";
+import MatchSchedulePage from "@/core/pages/MatchSchedulePage";
 import { MatchValidationPage } from "@/core/pages/MatchValidationPage";
 import PitAssignmentsPage from "@/core/pages/PitAssignmentsPage";
 import TestLandingPage from "@/core/pages/test/TestLandingPage";
@@ -145,6 +146,7 @@ function App() {
         <Route path="/scout-management" element={<ScoutManagementDashboardPage />} />
         <Route path="/pit-assignments" element={<PitAssignmentsPage />} />
         <Route path="/achievements" element={<AchievementsPage />} />
+        <Route path="/match-schedule" element={<MatchSchedulePage />} />
         <Route path="/match-validation" element={<MatchValidationPage />} />
         <Route path="/dev-utilities" element={<DevUtilitiesPage />} />
         <Route path="/test" element={<TestLandingPage />} />

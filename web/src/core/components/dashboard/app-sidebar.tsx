@@ -78,6 +78,10 @@ const data = {
           url: "/match-strategy",
         },
         {
+          title: "Match Schedule",
+          url: "/match-schedule",
+        },
+        {
           title: "Match Validation",
           url: "/match-validation",
         },

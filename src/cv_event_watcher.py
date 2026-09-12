@@ -237,9 +237,15 @@ def push_bundle_to_remote_api(
     import requests
 
     base = api_base.rstrip("/")
-    is_netlify = "/.netlify/functions/cv-api" in base or base.endswith("/cv-api")
+    # Query-param style: Cloudflare /cv-api or Netlify /.netlify/functions/cv-api
+    is_query_api = "/.netlify/functions/cv-api" in base or base.endswith("/cv-api")
+    if "YOUR-DOMAIN" in base or " " in base or "\n" in base:
+        raise RuntimeError(
+            f"CV_SYNC_API_URL looks invalid: {base!r}. "
+            "Set it alone, e.g. export CV_SYNC_API_URL='https://frc-cv-scout-pipeline.pages.dev/cv-api'"
+        )
 
-    if is_netlify:
+    if is_query_api:
         url = f"{base}?action=publish&event={event_key}&match={match_key}"
     else:
         url = f"{base}/api/cv/publish/{event_key}/{match_key}"
@@ -266,7 +272,7 @@ def push_bundle_to_remote_api(
             team = name.split("_team_")[-1].replace("_heatmap", "")
         if not team:
             continue
-        if is_netlify:
+        if is_query_api:
             heat_url = (
                 f"{base}?action=publish-heatmap&event={event_key}"
                 f"&match={match_key}&team={team}"

@@ -1,0 +1,85 @@
+{
+  "event_key": "2026tuis2",
+  "processed": {
+    "2026tuis2_qm1": {
+      "published": "outputs/cv-sync/2026tuis2/2026tuis2_qm1/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "bulk-republish"
+    },
+    "2026tuis2_qm10": {
+      "published": "outputs/cv-sync/2026tuis2/2026tuis2_qm10/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "bulk-republish"
+    },
+    "2026tuis2_qm11": {
+      "published": "outputs/cv-sync/2026tuis2/2026tuis2_qm11/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "bulk-republish"
+    },
+    "2026tuis2_qm2": {
+      "published": "outputs/cv-sync/2026tuis2/2026tuis2_qm2/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "bulk-republish"
+    },
+    "2026tuis2_qm3": {
+      "published": "outputs/cv-sync/2026tuis2/2026tuis2_qm3/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "bulk-republish"
+    },
+    "2026tuis2_qm4": {
+      "published": "outputs/cv-sync/2026tuis2/2026tuis2_qm4/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "bulk-republish"
+    },
+    "2026tuis2_qm5": {
+      "published": "outputs/cv-sync/2026tuis2/2026tuis2_qm5/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "bulk-republish"
+    },
+    "2026tuis2_qm6": {
+      "published": "outputs/cv-sync/2026tuis2/2026tuis2_qm6/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "bulk-republish"
+    },
+    "2026tuis2_qm7": {
+      "published": "outputs/cv-sync/2026tuis2/2026tuis2_qm7/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "bulk-republish"
+    },
+    "2026tuis2_qm8": {
+      "published": "outputs/cv-sync/2026tuis2/2026tuis2_qm8/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "bulk-republish"
+    },
+    "2026tuis2_qm9": {
+      "published": "outputs/cv-sync/2026tuis2/2026tuis2_qm9/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "bulk-republish"
+    },
+    "2026tuis2_qm12": {
+      "youtube": "https://www.youtube.com/watch?v=H9-lFxo--jw",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm12/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "2026-09-12T13:11:04.805152+00:00"
+    },
+    "2026tuis2_qm13": {
+      "youtube": "https://www.youtube.com/watch?v=C72zkERLjFE",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm13/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "2026-09-12T13:19:40.927927+00:00"
+    },
+    "2026tuis2_qm14": {
+      "youtube": "https://www.youtube.com/watch?v=Lrw9HwSqtA0",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm14/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "2026-09-12T13:27:50.449153+00:00"
+    },
+    "2026tuis2_qm15": {
+      "youtube": "https://www.youtube.com/watch?v=FKt4J4EiYBg",
+      "published": "/Users/efekapukulak/Desktop/Hobbies/Coding/ML/RobotDetector/outputs/cv-sync/2026tuis2/2026tuis2_qm15/ai_scout_bundle.json",
+      "remote_api": "https://frc-cv-scout-pipeline.pages.dev/cv-api",
+      "at": "2026-09-12T13:36:31.436199+00:00"
+    }
+  },
+  "failed": {}
+}
