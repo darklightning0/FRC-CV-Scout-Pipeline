@@ -1,12 +1,13 @@
-# Optional Wrangler config for Cloudflare Pages + CV KV.
-# Bindings can also be set only in the dashboard (Settings → Functions).
+# Cloudflare Pages — bindings are managed here (dashboard Bindings UI is locked).
+# Root directory in Pages should be `web/` so this file is used on deploy.
 
-name = "hunter-eyes"
+name = "frc-cv-scout-pipeline"
 compatibility_date = "2025-01-01"
 pages_build_output_dir = "dist"
 
-# After creating a KV namespace in the Cloudflare dashboard, paste its id here
-# or bind the same name in Pages → Settings → Functions → KV namespace bindings.
-# [[kv_namespaces]]
-# binding = "CV_TELEMETRY"
-# id = "YOUR_KV_NAMESPACE_ID"
+# KV namespace: frc_huntereyes
+# https://dash.cloudflare.com → Workers KV → frc_huntereyes
+[[kv_namespaces]]
+binding = "CV_TELEMETRY"
+id = "40a03f1e396c4afdbf542f872698bd3c"
+preview_id = "40a03f1e396c4afdbf542f872698bd3c"

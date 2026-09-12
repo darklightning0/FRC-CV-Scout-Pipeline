@@ -1,5 +1,3 @@
-/* SPA fallback — Cloudflare Pages Functions (/api-proxy etc.) take precedence */
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Cloudflare Pages: SPA fallback for client routes.
+# Pages Functions (/cv-api, /api-proxy) are matched before this rule.
+/*    /index.html   200
