@@ -520,6 +520,11 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
                                                     ? `${teamStats.matchesPlayed} scouted`
                                                     : '0 scouted'}
                                             </Badge>
+                                            {(teamStats.tbaMatchesPlayed ?? 0) > 0 && (
+                                                <Badge variant="outline" className="border-sky-500/40 text-sky-300">
+                                                    {teamStats.tbaMatchesPlayed} TBA
+                                                </Badge>
+                                            )}
                                             {cvMatchCount > 0 && (
                                                 <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
                                                     {cvMatchCount} CV
@@ -528,18 +533,28 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
                                             <Badge variant="default">
                                                 {teamStats.matchesPlayed > 0
                                                     ? `${teamStats.avgTotalPoints} avg pts`
-                                                    : cvMatchCount > 0
-                                                      ? 'CV only — scout for scores'
-                                                      : 'Pit only'}
+                                                    : (teamStats.tbaMatchesPlayed ?? 0) > 0
+                                                      ? 'TBA schedule — scout for team scores'
+                                                      : cvMatchCount > 0
+                                                        ? 'CV only — scout for scores'
+                                                        : 'Pit only'}
                                             </Badge>
                                         </div>
                                         {compareStats && (
                                             <div className="flex items-center gap-2">
                                                 <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/20">
-                                                    {compareStats.matchesPlayed > 0 ? `${compareStats.matchesPlayed} matches` : 'No matches'}
+                                                    {compareStats.matchesPlayed > 0
+                                                        ? `${compareStats.matchesPlayed} scouted`
+                                                        : (compareStats.tbaMatchesPlayed ?? 0) > 0
+                                                          ? `${compareStats.tbaMatchesPlayed} TBA`
+                                                          : 'No matches'}
                                                 </Badge>
                                                 <Badge variant="outline" className="bg-purple-600 text-white border-transparent">
-                                                    {compareStats.matchesPlayed > 0 ? `${compareStats.avgTotalPoints} avg pts` : 'Pit only'}
+                                                    {compareStats.matchesPlayed > 0
+                                                        ? `${compareStats.avgTotalPoints} avg pts`
+                                                        : (compareStats.tbaMatchesPlayed ?? 0) > 0
+                                                          ? 'TBA only'
+                                                          : 'Pit only'}
                                                 </Badge>
                                             </div>
                                         )}

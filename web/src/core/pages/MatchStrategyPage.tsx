@@ -16,6 +16,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { MatchHeader } from "@/core/components/MatchStrategy/MatchHeader";
+import { MatchResultsPanel } from "@/core/components/MatchStrategy/MatchResultsPanel";
 import { FieldStrategy } from "@/core/components/MatchStrategy/FieldStrategy";
 import { TeamAnalysis } from "@/core/components/MatchStrategy/TeamAnalysis";
 import { clearAllStrategies, saveAllStrategyCanvases } from "@/core/lib/strategyCanvasUtils";
@@ -246,6 +247,14 @@ const MatchStrategyPage = (props: MatchStrategyPageProps) => {
                     onClearAll={handleClearAll}
                     onSaveAll={handleSaveAll}
                 />
+
+                {selectedEvent && matchNumber.trim() && (
+                    <MatchResultsPanel
+                        eventKey={selectedEvent}
+                        matchNumber={matchNumber}
+                        className="w-full"
+                    />
+                )}
 
                 <div className="flex flex-col gap-8 w-full pb-6">
                     <FieldStrategy

@@ -226,13 +226,15 @@ export const useTeamStats = () => {
                 : 'events:none';
             const includePlayoffs = localStorage.getItem(FUEL_MOPR_INCLUDE_PLAYOFFS_STORAGE_KEY) !== 'false';
 
+            const allMatches = (
+                await Promise.all(eventKeysForOpr.map(eventKey => getCachedTBAEventMatches(eventKey, true)))
+            ).flat();
+            const { countTbaMatchesPlayedForTeam } = await import('@/core/lib/tbaMatchResults');
+            const tbaMatchesPlayed = countTbaMatchesPlayedForTeam(allMatches, teamNum);
+
             let oprByTeam = fuelOprCacheRef.current.get(cacheKey);
 
             if (!oprByTeam) {
-                const allMatches = (
-                    await Promise.all(eventKeysForOpr.map(eventKey => getCachedTBAEventMatches(eventKey, true)))
-                ).flat();
-
                 const fixed = calculateFuelOPR(allMatches, {
                     ridgeLambda: FIXED_FUEL_MOPR_LAMBDA,
                     includePlayoffs,
@@ -279,7 +281,7 @@ export const useTeamStats = () => {
             }
 
             if (entries.length === 0) {
-                // Return a basic object with matchesPlayed: 0
+                // No scout rows — still surface TBA match count + external EPA/OPR
                 return {
                     teamNumber: teamNum,
                     eventKey: resolvedEventKey,
@@ -293,6 +295,7 @@ export const useTeamStats = () => {
                     teleop: { avgPoints: 0, avgGamePiece1: 0, avgGamePiece2: 0 },
                     endgame: { avgPoints: 0, climbRate: 0, parkRate: 0 },
                     matchesPlayed: 0,
+                    tbaMatchesPlayed,
                     fuelAutoOPR: round1(teamOpr?.auto ?? 0),
                     fuelTeleopOPR: round1(teamOpr?.teleop ?? 0),
                     fuelTotalOPR: round1(teamOpr?.total ?? 0),
@@ -349,6 +352,7 @@ export const useTeamStats = () => {
             baseStats.fuelAutoOPR = round1(teamOpr?.auto ?? 0);
             baseStats.fuelTeleopOPR = round1(teamOpr?.teleop ?? 0);
             baseStats.fuelTotalOPR = round1(teamOpr?.total ?? 0);
+            baseStats.tbaMatchesPlayed = tbaMatchesPlayed;
 
             const coprHubAuto = averageOrUndefined(coprSamples.map(sample => sample.hubAutoPoints));
             const coprHubTeleop = averageOrUndefined(coprSamples.map(sample => sample.hubTeleopPoints));

@@ -26,6 +26,7 @@ import {
 } from "@/core/lib/tbaDerivedCache";
 import type { TeamStats } from "@/core/types/team-stats";
 import { getStrategySnapshots } from "@/core/lib/strategySnapshotCache";
+import { countTbaMatchesPlayedForTeam } from "@/core/lib/tbaMatchResults";
 
 const FUEL_MOPR_INCLUDE_PLAYOFFS_STORAGE_KEY = 'fuelOprIncludePlayoffs';
 const FIXED_FUEL_MOPR_LAMBDA = 0.3;
@@ -463,6 +464,15 @@ export const useAllTeamStats = (
                         ...statboticsByTeam.keys(),
                     ]);
 
+                    for (const match of tbaMatches) {
+                        for (const alliance of ['red', 'blue'] as const) {
+                            for (const teamKey of match.alliances?.[alliance]?.team_keys ?? []) {
+                                const n = Number.parseInt(teamKey.replace(/^frc/i, ''), 10);
+                                if (Number.isFinite(n)) teamNumbers.add(n);
+                            }
+                        }
+                    }
+
                     for (const teamNumber of teamNumbers) {
                         const teamKey = `${key}::${teamNumber}`;
                         if (existingTeamKeys.has(teamKey)) {
@@ -475,6 +485,7 @@ export const useAllTeamStats = (
                         const statbotics = statboticsByTeam.get(teamNumber);
                         const rolling = rollingByTeam.get(teamNumber);
 
+                        teamStats.tbaMatchesPlayed = countTbaMatchesPlayedForTeam(tbaMatches, teamNumber);
                         teamStats.fuelAutoOPR = opr?.autoFuelOPR ?? 0;
                         teamStats.fuelTeleopOPR = opr?.teleopFuelOPR ?? 0;
                         teamStats.fuelTotalOPR = opr?.totalFuelOPR ?? 0;
@@ -600,6 +611,8 @@ function createEmptyTeamStats(teamNumber: number, eventKey: string): TeamStats {
         teamNumber,
         eventKey,
         matchCount: 0,
+        matchesPlayed: 0,
+        tbaMatchesPlayed: 0,
         totalPoints: 0,
         autoPoints: 0,
         teleopPoints: 0,

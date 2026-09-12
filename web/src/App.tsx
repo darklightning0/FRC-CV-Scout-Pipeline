@@ -112,7 +112,7 @@ function App() {
               logo={logo} 
               appName="Hunter Eyes"
               version="2026.8.0"
-              tagline="FRC CV scouting app"
+              tagline="FRC CV Scouting App"
             />
           } 
         />

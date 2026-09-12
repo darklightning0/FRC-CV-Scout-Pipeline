@@ -8,6 +8,10 @@ export interface TeamStats {
     teamNumber: number;
     eventKey: string;
     matchCount: number;
+    /** Scouted match count (same as matchesPlayed / matchCount from analysis). */
+    matchesPlayed: number;
+    /** Matches this team appears in from TBA cache (completed). */
+    tbaMatchesPlayed?: number;
 
     // Aggregate scores
     totalPoints: number;

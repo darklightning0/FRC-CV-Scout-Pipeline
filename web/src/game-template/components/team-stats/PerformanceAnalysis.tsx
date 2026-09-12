@@ -40,11 +40,17 @@ export function PerformanceAnalysis({
     const compareMatchResults = (compareStats as (TeamStats & { matchResults?: Record<string, unknown>[] }) | null)?.matchResults;
     const hasMatchResults = Array.isArray(matchResults) && matchResults.length > 0;
 
+    const tbaPlayed = teamStats.tbaMatchesPlayed ?? 0;
+
     if (teamStats.matchesPlayed === 0 && !hasMatchResults) {
         return (
             <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
-                    <p className="text-muted-foreground">No performance data available</p>
+                    <p className="text-muted-foreground">
+                        {tbaPlayed > 0
+                            ? `TBA shows ${tbaPlayed} completed match${tbaPlayed === 1 ? '' : 'es'}, but no scout performance rows yet.`
+                            : 'No performance data available'}
+                    </p>
                 </CardContent>
             </Card>
         );

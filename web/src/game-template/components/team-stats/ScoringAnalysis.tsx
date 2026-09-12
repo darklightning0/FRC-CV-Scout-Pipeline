@@ -36,12 +36,17 @@ export function ScoringAnalysis({
     ].some(value => typeof value === 'number');
 
     const hasExternalScoringData = hasCoprData || hasStatboticsData;
+    const tbaPlayed = teamStats.tbaMatchesPlayed ?? 0;
     
     if (teamStats.matchesPlayed === 0 && !hasExternalScoringData) {
         return (
             <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
-                    <p className="text-muted-foreground">No scoring data available</p>
+                    <p className="text-muted-foreground">
+                        {tbaPlayed > 0
+                            ? `TBA shows ${tbaPlayed} completed match${tbaPlayed === 1 ? '' : 'es'}, but no scout scoring yet.`
+                            : 'No scoring data available'}
+                    </p>
                 </CardContent>
             </Card>
         );

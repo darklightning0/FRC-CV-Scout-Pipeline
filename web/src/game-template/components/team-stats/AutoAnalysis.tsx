@@ -51,11 +51,17 @@ export function AutoAnalysis({
     startPositionConfig,
     showStartPositionMap = true,
 }: AutoAnalysisProps) {
+    const tbaPlayed = teamStats.tbaMatchesPlayed ?? 0;
+
     if (teamStats.matchesPlayed === 0) {
         return (
             <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
-                    <p className="text-muted-foreground">No autonomous data available</p>
+                    <p className="text-muted-foreground">
+                        {tbaPlayed > 0
+                            ? `TBA shows ${tbaPlayed} completed match${tbaPlayed === 1 ? '' : 'es'}, but no scout auto data yet.`
+                            : 'No autonomous data available'}
+                    </p>
                 </CardContent>
             </Card>
         );
