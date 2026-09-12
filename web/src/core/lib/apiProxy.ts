@@ -4,9 +4,9 @@ interface ProxyRequestOptions {
   apiKeyOverride?: string;
 }
 
-function getProxyBaseUrl(): string {
-  // With the Vite local-api-proxy plugin, same-origin /.netlify/functions works in DEV.
-  return '';
+function getProxyPaths(): string[] {
+  // Cloudflare Pages Function first, then Netlify (legacy), then empty base relative.
+  return ['/api-proxy', '/.netlify/functions/api-proxy'];
 }
 
 export async function proxyGetJson<T>(
@@ -27,83 +27,96 @@ export async function proxyGetJson<T>(
         : undefined;
 
   const apiKey = options.apiKeyOverride || envFallbackKey || '';
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    ...(apiKey ? { 'X-Client-Api-Key': apiKey } : {}),
+  };
 
-  try {
-    const response = await fetch(`${getProxyBaseUrl()}/.netlify/functions/api-proxy?${query.toString()}`, {
-      method: 'GET',
+  let lastError: unknown = null;
+
+  for (const path of getProxyPaths()) {
+    try {
+      const response = await fetch(`${path}?${query.toString()}`, {
+        method: 'GET',
+        headers,
+      });
+
+      const text = await response.text();
+      // SPA fallback HTML means this host has no function at that path
+      if (typeof text === 'string' && text.trimStart().startsWith('<!')) {
+        lastError = new Error(`API proxy unavailable at ${path}`);
+        continue;
+      }
+
+      let payload: unknown = null;
+      try {
+        payload = text ? JSON.parse(text) : null;
+      } catch {
+        payload = text;
+      }
+
+      if (!response.ok) {
+        const message =
+          typeof payload === 'object' &&
+          payload !== null &&
+          'error' in payload &&
+          typeof (payload as { error?: unknown }).error === 'string'
+            ? (payload as { error: string }).error
+            : `Proxy request failed (${response.status})`;
+        // Missing function / misconfig — try next path; auth errors should surface
+        if (response.status === 404 || response.status === 405) {
+          lastError = new Error(message);
+          continue;
+        }
+        throw new Error(message);
+      }
+
+      return payload as T;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  // Fallback to direct API calls if proxies are down (needs VITE_* key in the client build)
+  if (provider === 'tba') {
+    const directUrl = `https://www.thebluealliance.com/api/v3${endpoint}`;
+    const directRes = await fetch(directUrl, {
       headers: {
-        Accept: 'application/json',
-        ...(apiKey ? { 'X-Client-Api-Key': apiKey } : {}),
+        'X-TBA-Auth-Key': apiKey,
       },
     });
-
-    const text = await response.text();
-    let payload: unknown = null;
-
-    try {
-      payload = text ? JSON.parse(text) : null;
-    } catch {
-      // Vite SPA fallback returns HTML when the Netlify function isn't available
-      if (typeof text === 'string' && text.trimStart().startsWith('<!')) {
-        throw new Error('API proxy unavailable (got HTML). Restart the Vite dev server.');
-      }
-      payload = text;
-    }
-
-    if (!response.ok) {
-      const message =
-        (typeof payload === 'object' && payload !== null && 'error' in payload && typeof (payload as { error?: unknown }).error === 'string')
-          ? (payload as { error: string }).error
-          : `Proxy request failed (${response.status})`;
-      throw new Error(message);
-    }
-
-    return payload as T;
-  } catch (error) {
-    // Fallback to direct API calls if proxy is down
-    if (provider === 'tba') {
-      const directUrl = `https://www.thebluealliance.com/api/v3${endpoint}`;
-      try {
-        const directRes = await fetch(directUrl, {
-          headers: {
-            'X-TBA-Auth-Key': apiKey,
-          },
-        });
-        if (directRes.ok) return await directRes.json() as T;
-        const errText = await directRes.text();
-        throw new Error(`TBA direct request failed (${directRes.status}): ${errText.slice(0, 120)}`);
-      } catch (directError) {
-        throw directError instanceof Error ? directError : error;
-      }
-    } else if (provider === 'nexus') {
-      const directUrl = `https://frc.nexus/api/v1${endpoint}`;
-      try {
-        const directRes = await fetch(directUrl, {
-          headers: {
-            'Nexus-Api-Key': apiKey,
-            Accept: 'application/json',
-          },
-        });
-        if (directRes.ok) return await directRes.json() as T;
-      } catch {}
-    } else if (provider === 'statbotics') {
-      const bases = [
-        'https://api.statbotics.io/v3',
-        'https://api-statbotics.iterativerefinement.com/v3',
-      ];
-      for (const base of bases) {
-        try {
-          const directRes = await fetch(`${base}${endpoint}`);
-          if (!directRes.ok) continue;
-          const text = await directRes.text();
-          if (text.trim() === '{}' || text.trim() === '[]') continue;
-          return JSON.parse(text) as T;
-        } catch {
-          /* try next base */
-        }
-      }
-    }
-
-    throw error;
+    if (directRes.ok) return (await directRes.json()) as T;
+    const errText = await directRes.text();
+    throw new Error(`TBA direct request failed (${directRes.status}): ${errText.slice(0, 120)}`);
   }
+
+  if (provider === 'nexus') {
+    const directRes = await fetch(`https://frc.nexus/api/v1${endpoint}`, {
+      headers: {
+        'Nexus-Api-Key': apiKey,
+        Accept: 'application/json',
+      },
+    });
+    if (directRes.ok) return (await directRes.json()) as T;
+  }
+
+  if (provider === 'statbotics') {
+    const bases = [
+      'https://api.statbotics.io/v3',
+      'https://api-statbotics.iterativerefinement.com/v3',
+    ];
+    for (const base of bases) {
+      try {
+        const directRes = await fetch(`${base}${endpoint}`);
+        if (!directRes.ok) continue;
+        const text = await directRes.text();
+        if (text.trim() === '{}' || text.trim() === '[]') continue;
+        return JSON.parse(text) as T;
+      } catch {
+        /* try next */
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('API proxy unavailable');
 }

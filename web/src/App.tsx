@@ -74,139 +74,12 @@ import {
   GameSpecificScoutOptions,
 } from "@/game-template/components";
 import logo from "../src/assets/huntereyes-logo.jpeg";
-import { generateDemoEvent, generateDemoEventScheduleOnly } from "@/core/lib/demoDataGenerator";
-import { generate2026GameData } from "@/game-template/demoDataGenerator2026";
-import { db, pitDB, gameDB } from "@/db";
-import { clearEventCache, clearEventValidationResults, getCachedTBAEventKeys, getCachedTBAEventMatches } from "@/core/lib/tbaCache";
+import { getCachedTBAEventKeys, getCachedTBAEventMatches } from "@/core/lib/tbaCache";
 
 // Mock implementations for missing template parts
 const mockConfig = { year: 2026, gameName: "REBUILT", scoring: { auto: {}, teleop: {}, endgame: {} } };
 const mockValidation = { getDataCategories: () => [], calculateAllianceStats: () => ({}), calculateAllianceScore: () => ({ auto: 0, teleop: 0, endgame: 0, total: 0 }), validateMatch: async () => ({} as any), getDefaultConfig: () => ({} as any) };
 const mockUI = { GameStartScreen: () => null, AutoScoringScreen: () => null, TeleopScoringScreen: () => null };
-
-// Demo data handlers
-const DEMO_EVENT_KEY = 'demo2026';
-const DEMO_FOCUS_TEAM_NUMBERS = [1000, 2000] as const;
-const DEMO_EXTRA_EVENT_KEYS = [
-  'demo2026_week2',
-  'demo2026_week3',
-  'demo2026_week4',
-] as const;
-const DEMO_ALL_EVENT_KEYS = [DEMO_EVENT_KEY, ...DEMO_EXTRA_EVENT_KEYS] as const;
-
-const loadDemoData = async () => {
-  console.log('🎲 Loading demo data...');
-
-  // Generate the original full event dataset.
-  await generateDemoEvent({
-    eventKey: DEMO_EVENT_KEY,
-    clearExisting: true,
-    gameDataGenerator: generate2026GameData,
-    includePlayoffs: true,
-    seedFakeValidationResults: false,
-  });
-
-  // Add extra events for only the two focus teams so multi-event comparisons still exist.
-  for (const eventKey of DEMO_EXTRA_EVENT_KEYS) {
-    await generateDemoEvent({
-      eventKey,
-      clearExisting: true,
-      gameDataGenerator: generate2026GameData,
-      includePlayoffs: true,
-      seedFakeValidationResults: false,
-      focusTeamNumbers: [...DEMO_FOCUS_TEAM_NUMBERS],
-    });
-  }
-  
-  // Update local storage for demo event
-  localStorage.setItem('eventName', DEMO_EVENT_KEY);
-  
-  const eventsList = JSON.parse(localStorage.getItem('eventsList') || '[]');
-  for (const eventKey of DEMO_ALL_EVENT_KEYS) {
-    if (!eventsList.includes(eventKey)) {
-      eventsList.push(eventKey);
-    }
-  }
-  localStorage.setItem('eventsList', JSON.stringify(eventsList));
-  
-  // Update scouts list
-  const scouts = await gameDB.scouts.toArray();
-  const scoutNames = scouts.map(s => s.name).sort();
-  localStorage.setItem('scoutsList', JSON.stringify(scoutNames));
-  
-  console.log('✅ Demo data loaded successfully!');
-};
-
-const loadDemoScheduleOnly = async () => {
-  console.log('🗓️ Loading demo schedule only...');
-
-  await generateDemoEventScheduleOnly({
-    eventKey: DEMO_EVENT_KEY,
-    clearExisting: true,
-  });
-
-  localStorage.setItem('eventName', DEMO_EVENT_KEY);
-
-  const eventsList = JSON.parse(localStorage.getItem('eventsList') || '[]');
-  if (!eventsList.includes(DEMO_EVENT_KEY)) {
-    eventsList.push(DEMO_EVENT_KEY);
-    localStorage.setItem('eventsList', JSON.stringify(eventsList));
-  }
-
-  console.log('✅ Demo schedule loaded successfully!');
-};
-
-const clearDemoData = async () => {
-  console.log('🗑️ Clearing demo data...');
-  
-  // Clear all demo data from databases
-  for (const eventKey of DEMO_ALL_EVENT_KEYS) {
-    await db.scoutingData.where('eventKey').equals(eventKey).delete();
-    await pitDB.pitScoutingData.where('eventKey').equals(eventKey).delete();
-    await gameDB.predictions.where('eventKey').equals(eventKey).delete();
-    await clearEventCache(eventKey);
-    await clearEventValidationResults(eventKey);
-  }
-  await gameDB.scouts.clear();
-  await gameDB.scoutAchievements.clear();
-  
-  // Clear from local storage
-  const eventsList = JSON.parse(localStorage.getItem('eventsList') || '[]');
-  const filtered = eventsList.filter((e: string) => !DEMO_ALL_EVENT_KEYS.includes(e as typeof DEMO_ALL_EVENT_KEYS[number]));
-  localStorage.setItem('eventsList', JSON.stringify(filtered));
-  
-  if (DEMO_ALL_EVENT_KEYS.includes((localStorage.getItem('eventName') || '') as typeof DEMO_ALL_EVENT_KEYS[number])) {
-    localStorage.removeItem('eventName');
-  }
-
-  if (DEMO_ALL_EVENT_KEYS.includes((localStorage.getItem('eventKey') || '') as typeof DEMO_ALL_EVENT_KEYS[number])) {
-    localStorage.removeItem('eventKey');
-  }
-
-  const customEvents = JSON.parse(localStorage.getItem('customEventsList') || '[]');
-  const filteredCustomEvents = customEvents.filter((e: string) => !DEMO_ALL_EVENT_KEYS.includes(e as typeof DEMO_ALL_EVENT_KEYS[number]));
-  localStorage.setItem('customEventsList', JSON.stringify(filteredCustomEvents));
-
-  localStorage.removeItem('matchData');
-  
-  console.log('✅ Demo data cleared successfully!');
-};
-
-const checkDemoData = async (): Promise<boolean> => {
-  for (const eventKey of DEMO_ALL_EVENT_KEYS) {
-    const entryCount = await db.scoutingData.where('eventKey').equals(eventKey).count();
-    if (entryCount > 0) {
-      return true;
-    }
-
-    const cachedMatches = await getCachedTBAEventMatches(eventKey);
-    if (cachedMatches.length > 0) {
-      return true;
-    }
-  }
-
-  return false;
-};
 
 function App() {
   const router = createBrowserRouter(
@@ -239,13 +112,7 @@ function App() {
               logo={logo} 
               appName="Hunter Eyes"
               version="2026.8.0"
-              onLoadDemoData={loadDemoData}
-              onLoadDemoScheduleOnly={loadDemoScheduleOnly}
-              onClearData={clearDemoData}
-              checkExistingData={checkDemoData}
-              demoDataDescription="Load standard demo data (30 teams, 60 matches, 8 scouts) plus 3 extra events for teams 1000 and 2000 to test multi-event views"
-              demoDataStats="Demo data loaded! Full event + teams 1000/2000 across 4 events"
-              demoScheduleStats="Demo schedule loaded! 30 teams, 60 matches"
+              tagline="FRC CV scouting app"
             />
           } 
         />
