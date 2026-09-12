@@ -160,6 +160,7 @@ export const useAllTeamStats = (
     const [error, setError] = useState<Error | null>(null);
     const [cachedOnlyTeamStats, setCachedOnlyTeamStats] = useState<TeamStats[]>([]);
     const [fuelOprByEventTeam, setFuelOprByEventTeam] = useState<Map<string, FuelOprTeamEntry>>(new Map());
+    const [tbaPlayedByEventTeam, setTbaPlayedByEventTeam] = useState<Map<string, number>>(new Map());
     const [rollingRatingsByEventTeamMatch, setRollingRatingsByEventTeamMatch] = useState<RollingRatingsByMatch>(new Map());
     const [snapshotLoadMs, setSnapshotLoadMs] = useState(0);
     const [fuelOprLoadMs, setFuelOprLoadMs] = useState(0);
@@ -254,6 +255,57 @@ export const useAllTeamStats = (
             cancelled = true;
         };
     }, [eventKey, scoutedTeamStats, includeFuelOpr]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadTbaPlayedCounts = async () => {
+            let keys: string[] = eventKey
+                ? [eventKey]
+                : [...new Set(
+                    scoutedTeamStats.map(team => team.eventKey).filter((key): key is string => !!key)
+                )];
+
+            if (keys.length === 0) {
+                keys = await getCachedTBAEventKeys();
+            }
+
+            if (cancelled) return;
+
+            if (keys.length === 0) {
+                setTbaPlayedByEventTeam(new Map());
+                return;
+            }
+
+            const next = new Map<string, number>();
+            for (const key of keys) {
+                const matches = await getCachedTBAEventMatches(key, true);
+                if (cancelled) return;
+                const teamNumbers = new Set<number>();
+                for (const match of matches) {
+                    for (const alliance of ['red', 'blue'] as const) {
+                        for (const teamKey of match.alliances?.[alliance]?.team_keys ?? []) {
+                            const n = Number.parseInt(teamKey.replace(/^frc/i, ''), 10);
+                            if (Number.isFinite(n)) teamNumbers.add(n);
+                        }
+                    }
+                }
+                for (const teamNumber of teamNumbers) {
+                    next.set(`${key}::${teamNumber}`, countTbaMatchesPlayedForTeam(matches, teamNumber));
+                }
+            }
+
+            if (!cancelled) {
+                setTbaPlayedByEventTeam(next);
+            }
+        };
+
+        void loadTbaPlayedCounts();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [eventKey, scoutedTeamStats]);
 
     useEffect(() => {
         let cancelled = false;
@@ -362,6 +414,10 @@ export const useAllTeamStats = (
             return {
                 ...baseStats,
                 matchResults,
+                tbaMatchesPlayed:
+                    tbaPlayedByEventTeam.get(`${eventKeyForTeam}::${teamNumber}`)
+                    ?? baseStats.tbaMatchesPlayed
+                    ?? 0,
                 fuelAutoOPR: fuelOpr?.autoFuelOPR ?? (baseStats.fuelAutoOPR ?? 0),
                 fuelTeleopOPR: fuelOpr?.teleopFuelOPR ?? (baseStats.fuelTeleopOPR ?? 0),
                 fuelTotalOPR: fuelOpr?.totalFuelOPR ?? (baseStats.fuelTotalOPR ?? 0),
@@ -399,7 +455,7 @@ export const useAllTeamStats = (
             enrichedScoutedTeamStats: enriched,
             enrichmentMs: performance.now() - startedAt,
         };
-    }, [scoutedTeamStats, eventKey, fuelOprByEventTeam, rollingRatingsByEventTeamMatch]);
+    }, [scoutedTeamStats, eventKey, fuelOprByEventTeam, rollingRatingsByEventTeamMatch, tbaPlayedByEventTeam]);
 
     useEffect(() => {
         let cancelled = false;

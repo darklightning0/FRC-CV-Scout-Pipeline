@@ -25,6 +25,8 @@ export const TeamStatsDetail = ({ stats, activeStatsTab, displayMode }: TeamStat
     const gridCols = phaseConfig.gridCols || 3;
     const visibleStats = getVisibleMatchStrategyStats(activeStatsTab, displayMode);
     const visibleColumnCount = Math.max(1, Math.min(gridCols, visibleStats.length || 1));
+    const scoutedCount = stats.matchesPlayed ?? stats.matchCount ?? 0;
+    const tbaCount = stats.tbaMatchesPlayed ?? 0;
 
     return (
         <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
@@ -70,8 +72,18 @@ export const TeamStatsDetail = ({ stats, activeStatsTab, displayMode }: TeamStat
                 )}
             </div>
 
-            <div className="text-center text-xs text-muted-foreground mt-2">
-                {stats.matchCount} matches played
+            <div className="flex flex-wrap items-center justify-center gap-1.5 mt-2">
+                <Badge variant="outline" className="bg-muted/50 text-[10px] px-1.5 py-0 h-5 font-normal">
+                    {scoutedCount} scouted
+                </Badge>
+                {tbaCount > 0 && (
+                    <Badge variant="outline" className="border-sky-500/40 text-sky-300 text-[10px] px-1.5 py-0 h-5 font-normal">
+                        {tbaCount} TBA
+                    </Badge>
+                )}
+                {scoutedCount === 0 && tbaCount === 0 && (
+                    <span className="text-xs text-muted-foreground">0 matches played</span>
+                )}
             </div>
         </div>
     );
