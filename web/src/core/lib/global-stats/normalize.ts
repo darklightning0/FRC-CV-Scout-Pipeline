@@ -131,13 +131,19 @@ export function matchesGlobalStatsFilters(
     if (!team.years.some((entry) => entry.year === year)) return false;
   }
 
+  if (filters.district && filters.district !== "all") {
+    if ((team.districtCode || "").toUpperCase() !== filters.district.toUpperCase()) {
+      return false;
+    }
+  }
+
   const query = foldLocation(filters.search);
   if (!query) return true;
 
   const awardsStr = (team.awards ?? []).map((a) => `${a.year} ${a.name}`).join(" ");
   const canon = canonicalCity(team.city, team.state);
   const haystack = foldLocation(
-    `${team.teamNumber} ${team.name} ${canon} ${team.city ?? ""} ${team.state ?? ""} ${team.country ?? ""} ${awardsStr}`
+    `${team.teamNumber} ${team.name} ${team.schoolName ?? ""} ${team.robotName ?? ""} ${team.districtCode ?? ""} ${canon} ${team.city ?? ""} ${team.state ?? ""} ${team.country ?? ""} ${awardsStr}`
   );
   return haystack.includes(query);
 }

@@ -11,16 +11,22 @@ type Provider = 'tba' | 'nexus' | 'statbotics' | 'first';
 
 const TBA_BASE_URL = 'https://www.thebluealliance.com/api/v3';
 const NEXUS_BASE_URL = 'https://frc.nexus/api/v1';
-const STATBOTICS_BASE_URL = 'https://api.statbotics.io/v3';
-const STATBOTICS_FALLBACK_BASE_URL = 'https://api-statbotics.iterativerefinement.com/v3';
+const STATBOTICS_BASE_URL = 'https://api-statbotics.iterativerefinement.com/v3';
+const STATBOTICS_FALLBACK_BASE_URL = 'https://api.statbotics.io/v3';
 const FIRST_BASE_URL = 'https://frc-api.firstinspires.org/v3.0';
 
 const tbaAllowed = [
   /^\/events\/\d+(?:\/simple)?$/,
   /^\/event\/[a-z0-9]+\/matches(?:\/simple)?$/i,
   /^\/event\/[a-z0-9]+\/coprs$/i,
-  /^\/event\/[a-z0-9]+\/teams\/keys$/i,
+  /^\/event\/[a-z0-9]+\/teams(?:\/keys|\/simple)?$/i,
   /^\/match\/[a-z0-9_]+$/i,
+  /^\/team\/frc\d+(?:\/simple)?$/i,
+  /^\/team\/frc\d+\/years$/i,
+  /^\/team\/frc\d+\/awards$/i,
+  /^\/team\/frc\d+\/events(?:\/\d+)?(?:\/simple)?$/i,
+  /^\/teams\/\d+(?:\/simple)?$/i,
+  /^\/teams\/\d+\/\d+(?:\/simple)?$/i,
 ];
 
 const nexusAllowed = [
@@ -30,13 +36,26 @@ const nexusAllowed = [
   /^\/event\/[a-z0-9]+\/map$/i,
 ];
 
-const statboticsAllowed = [/^\/team_event\/\d+\/[a-z0-9]+$/i];
+const statboticsAllowed = [
+  /^\/team_event\/\d+\/[a-z0-9]+$/i,
+  /^\/team_events$/i,
+  /^\/team\/\d+$/i,
+  /^\/team_year\/\d+\/\d+$/i,
+  /^\/teams$/i,
+  /^\/team_years$/i,
+];
 
 const firstAllowed = [
   /^\/\d{4}\/(?:teams|events|matches|scores|rankings|awards|districts)(?:\/.*)?$/i,
 ];
 
+function endpointPath(endpoint: string): string {
+  const queryIndex = endpoint.indexOf('?');
+  return queryIndex === -1 ? endpoint : endpoint.slice(0, queryIndex);
+}
+
 function isAllowedEndpoint(provider: Provider, endpoint: string): boolean {
+  const path = endpointPath(endpoint);
   const rules =
     provider === 'tba'
       ? tbaAllowed
@@ -45,8 +64,10 @@ function isAllowedEndpoint(provider: Provider, endpoint: string): boolean {
         : provider === 'statbotics'
           ? statboticsAllowed
           : firstAllowed;
-  return rules.some((rule) => rule.test(endpoint));
+  return rules.some((rule) => rule.test(path));
 }
+
+const DEFAULT_FIRST_AUTH = 'ZGFya2xpZ2h0bmluZzoyMDQ0ZmE1YS04MDE5LTQ5MTktOTM3Yy0wNjY0MWJiMGMyYWQ=';
 
 function getServerApiKey(env: Record<string, string | undefined>, provider: Provider): string {
   if (provider === 'tba') {
@@ -65,10 +86,10 @@ function getServerApiKey(env: Record<string, string | undefined>, provider: Prov
       try {
         return btoa(`${username}:${token}`);
       } catch {
-        return '';
+        return DEFAULT_FIRST_AUTH;
       }
     }
-    return '';
+    return DEFAULT_FIRST_AUTH;
   }
   return env.STATBOTICS_API_KEY || env.VITE_STATBOTICS_API_KEY || '';
 }
@@ -105,7 +126,7 @@ export async function onRequest(context: {
     const provider = (url.searchParams.get('provider') || '').toLowerCase() as Provider;
     const endpoint = url.searchParams.get('endpoint') || '';
 
-    if (provider !== 'tba' && provider !== 'nexus' && provider !== 'statbotics') {
+    if (provider !== 'tba' && provider !== 'nexus' && provider !== 'statbotics' && provider !== 'first') {
       return json(400, { error: 'Invalid provider' });
     }
     if (!endpoint.startsWith('/') || !isAllowedEndpoint(provider, endpoint)) {

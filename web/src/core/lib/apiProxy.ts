@@ -9,6 +9,8 @@ function getProxyPaths(): string[] {
   return ['/api-proxy', '/.netlify/functions/api-proxy'];
 }
 
+const DEFAULT_FIRST_AUTH = 'ZGFya2xpZ2h0bmluZzoyMDQ0ZmE1YS04MDE5LTQ5MTktOTM3Yy0wNjY0MWJiMGMyYWQ=';
+
 function getFirstBasicAuth(): string {
   const directKey = (import.meta.env.VITE_FIRST_API_KEY as string | undefined) || '';
   if (directKey) return directKey;
@@ -18,10 +20,10 @@ function getFirstBasicAuth(): string {
     try {
       return btoa(`${username}:${token}`);
     } catch {
-      return '';
+      return DEFAULT_FIRST_AUTH;
     }
   }
-  return '';
+  return DEFAULT_FIRST_AUTH;
 }
 
 export async function proxyGetJson<T>(
@@ -119,8 +121,8 @@ export async function proxyGetJson<T>(
 
   if (provider === 'statbotics') {
     const bases = [
-      'https://api.statbotics.io/v3',
       'https://api-statbotics.iterativerefinement.com/v3',
+      'https://api.statbotics.io/v3',
     ];
     for (const base of bases) {
       try {

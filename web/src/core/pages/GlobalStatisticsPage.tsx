@@ -92,14 +92,17 @@ function TeamYearTable({ years }: { years: GlobalTeamYear[] }) {
           <TableRow>
             <TableHead className="font-semibold">Year</TableHead>
             <TableHead className="font-semibold">EPA</TableHead>
+            <TableHead className="font-semibold">Norm</TableHead>
             <TableHead className="font-semibold">Auto</TableHead>
             <TableHead className="font-semibold">Teleop</TableHead>
             <TableHead className="font-semibold">Endgame</TableHead>
+            <TableHead className="font-semibold">Peak</TableHead>
             <TableHead className="font-semibold">Record</TableHead>
             <TableHead className="font-semibold">Win%</TableHead>
-            <TableHead className="font-semibold">World Rank</TableHead>
-            <TableHead className="font-semibold">Country Rank</TableHead>
-            {extraKeys.slice(0, 10).map((key) => (
+            <TableHead className="font-semibold">World</TableHead>
+            <TableHead className="font-semibold">Country</TableHead>
+            <TableHead className="font-semibold">District</TableHead>
+            {extraKeys.slice(0, 8).map((key) => (
               <TableHead key={key} className="capitalize text-xs">
                 {key.replace(/_/g, " ")}
               </TableHead>
@@ -111,14 +114,17 @@ function TeamYearTable({ years }: { years: GlobalTeamYear[] }) {
             <TableRow key={year.year}>
               <TableCell className="font-bold">{year.year}</TableCell>
               <TableCell className="font-semibold text-primary">{formatNum(year.epaTotal)}</TableCell>
+              <TableCell className="text-muted-foreground font-mono text-xs">{year.epaNorm != null ? formatNum(year.epaNorm, 0) : "—"}</TableCell>
               <TableCell>{formatNum(year.epaAuto)}</TableCell>
               <TableCell>{formatNum(year.epaTeleop)}</TableCell>
               <TableCell>{formatNum(year.epaEndgame)}</TableCell>
+              <TableCell className="font-semibold text-amber-500">{formatNum(year.epaMax)}</TableCell>
               <TableCell>{formatRecord(year.record)}</TableCell>
               <TableCell>{formatPct(year.record?.winrate)}</TableCell>
               <TableCell>{year.ranks?.worldRank ? `#${year.ranks.worldRank}` : "—"}</TableCell>
               <TableCell>{year.ranks?.countryRank ? `#${year.ranks.countryRank}` : "—"}</TableCell>
-              {extraKeys.slice(0, 10).map((key) => (
+              <TableCell>{year.ranks?.districtRank ? `#${year.ranks.districtRank}` : "—"}</TableCell>
+              {extraKeys.slice(0, 8).map((key) => (
                 <TableCell key={key} className="text-xs">
                   {formatNum(year.breakdown?.[key], 2)}
                 </TableCell>
@@ -145,17 +151,23 @@ export default function GlobalStatisticsPage() {
     bundleGeneratedAt,
     countryOptions,
     cityOptions,
+    districtOptions,
     yearOptions,
     toggleSort,
     resetFilters,
     lookupTeam,
-    syncStatbotics,
-    syncFirstApi,
+    syncAll,
   } = useGlobalTeamStats();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<GlobalTeamProfile | null>(null);
-  const [enrichedFirstData, setEnrichedFirstData] = useState<{ robotName?: string | null; schoolName?: string | null } | null>(null);
+  const [enrichedFirstData, setEnrichedFirstData] = useState<{
+    robotName?: string | null;
+    schoolName?: string | null;
+    nameFull?: string | null;
+    website?: string | null;
+    districtCode?: string | null;
+  } | null>(null);
   const [lookupValue, setLookupValue] = useState("");
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
@@ -164,8 +176,14 @@ export default function GlobalStatisticsPage() {
       setEnrichedFirstData(null);
       return;
     }
-    if (selectedTeam.robotName || selectedTeam.schoolName) {
-      setEnrichedFirstData({ robotName: selectedTeam.robotName, schoolName: selectedTeam.schoolName });
+    if (selectedTeam.robotName || selectedTeam.schoolName || selectedTeam.website || selectedTeam.fullName) {
+      setEnrichedFirstData({
+        robotName: selectedTeam.robotName,
+        schoolName: selectedTeam.schoolName,
+        nameFull: selectedTeam.fullName,
+        website: selectedTeam.website,
+        districtCode: selectedTeam.districtCode,
+      });
       return;
     }
     const season = selectedTeam.lastActiveYear || 2026;
@@ -173,7 +191,13 @@ export default function GlobalStatisticsPage() {
     fetchFirstTeam(season, selectedTeam.teamNumber)
       .then((data) => {
         if (!cancelled && data) {
-          setEnrichedFirstData({ robotName: data.robotName, schoolName: data.schoolName });
+          setEnrichedFirstData({
+            robotName: data.robotName,
+            schoolName: data.schoolName,
+            nameFull: data.nameFull,
+            website: data.website,
+            districtCode: data.districtCode,
+          });
         }
       })
       .catch(() => {});
@@ -182,40 +206,21 @@ export default function GlobalStatisticsPage() {
     };
   }, [selectedTeam]);
 
-  const handleSyncStatbotics = async () => {
+  const handleSyncAll = async () => {
     const targetYear =
       filters.year !== "all" && Number.isFinite(Number(filters.year))
         ? Number(filters.year)
         : 2026;
-    toast.loading(`Pulling latest ${targetYear} season data from Statbotics...`, {
-      id: "statbotics-sync",
+    toast.loading(`Pulling latest ${targetYear} season telemetry & rosters from Statbotics + FIRST Inspires...`, {
+      id: "sync-all",
     });
-    const res = await syncStatbotics(targetYear);
+    const res = await syncAll(targetYear);
     if (res.error) {
-      toast.error(`Sync failed: ${res.error}`, { id: "statbotics-sync" });
+      toast.error(`Sync failed: ${res.error}`, { id: "sync-all" });
     } else {
       toast.success(
-        `Synced ${res.updated} teams for season ${res.year} from Statbotics`,
-        { id: "statbotics-sync" }
-      );
-    }
-  };
-
-  const handleSyncFirstApi = async () => {
-    const targetYear =
-      filters.year !== "all" && Number.isFinite(Number(filters.year))
-        ? Number(filters.year)
-        : 2026;
-    toast.loading(`Pulling official ${targetYear} season roster & districts from FIRST API...`, {
-      id: "first-sync",
-    });
-    const res = await syncFirstApi(targetYear);
-    if (res.error) {
-      toast.error(`FIRST API sync failed: ${res.error}`, { id: "first-sync" });
-    } else {
-      toast.success(
-        `Successfully synced ${res.updated} teams for season ${res.year} from FIRST Inspires API!`,
-        { id: "first-sync" }
+        `Synced ${res.updated} teams for ${res.year} (Statbotics EPA & FIRST Inspires official rosters)!`,
+        { id: "sync-all" }
       );
     }
   };
@@ -329,22 +334,12 @@ export default function GlobalStatisticsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleSyncStatbotics}
+              onClick={handleSyncAll}
               disabled={syncLoading}
-              className="gap-2 text-xs h-9 border-primary/20 hover:border-primary/50 hover:bg-primary/5 shadow-xs"
+              className="gap-2 text-xs h-9 border-primary/30 hover:border-primary/60 hover:bg-primary/5 text-primary shadow-xs font-semibold"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${syncLoading ? "animate-spin text-primary" : "text-muted-foreground"}`} />
-              {syncLoading ? "Syncing..." : `Sync Statbotics (${filters.year === "all" ? "2026" : filters.year})`}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSyncFirstApi}
-              disabled={syncLoading}
-              className="gap-2 text-xs h-9 border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-500/5 text-amber-600 dark:text-amber-400 shadow-xs"
-            >
-              <Bot className={`h-3.5 w-3.5 ${syncLoading ? "animate-spin text-amber-500" : "text-amber-500"}`} />
-              {syncLoading ? "Syncing..." : `Sync FIRST (${filters.year === "all" ? "2026" : filters.year})`}
+              <RefreshCw className={`h-3.5 w-3.5 ${syncLoading ? "animate-spin text-primary" : "text-primary"}`} />
+              {syncLoading ? "Syncing All Sources..." : `Sync Live Data (${filters.year === "all" ? "2026" : filters.year})`}
             </Button>
             <DataAttribution sources={["tba", "statbotics", "first"]} variant="compact" />
           </div>
@@ -548,6 +543,20 @@ export default function GlobalStatisticsPage() {
                 With Awards
               </Button>
 
+              {/* Districts selector */}
+              {districtOptions.length > 1 && (
+                <div className="w-28">
+                  <GenericSelector
+                    label="District"
+                    value={filters.district || "all"}
+                    onValueChange={(val) => setFilters((prev) => ({ ...prev, district: val }))}
+                    availableOptions={districtOptions}
+                    displayFormat={(val) => (val === "all" ? "Districts" : val)}
+                    className="h-7 text-xs px-2 border-amber-500/30 font-medium"
+                  />
+                </div>
+              )}
+
               {(filters.city !== "all" ||
                 filters.search ||
                 filters.activeOnly ||
@@ -668,6 +677,12 @@ export default function GlobalStatisticsPage() {
                       Endgame {getSortIcon("endgame")}
                     </TableHead>
                     <TableHead
+                      className="cursor-pointer hover:bg-muted/70 font-semibold text-center hidden md:table-cell"
+                      onClick={() => toggleSort("epaMax")}
+                    >
+                      Peak {getSortIcon("epaMax")}
+                    </TableHead>
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/70 font-semibold text-center hidden lg:table-cell"
                       onClick={() => toggleSort("worldRank")}
                     >
@@ -696,17 +711,26 @@ export default function GlobalStatisticsPage() {
                       onClick={() => setSelectedTeam(team)}
                     >
                       <TableCell className="font-bold text-primary">
-                        {team.teamNumber}
-                        {team.districtCode && (
-                          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-semibold border border-amber-500/30">
-                            {team.districtCode}
-                          </span>
-                        )}
-                        {!team.active && (
-                          <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] bg-muted text-muted-foreground font-normal">
-                            Inactive
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          <span>{team.teamNumber}</span>
+                          {team.districtCode && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-semibold border border-amber-500/30">
+                              {team.districtCode}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 mt-0.5 font-normal">
+                          {team.rookieYear && (
+                            <span className="text-[9px] text-muted-foreground">
+                              '{String(team.rookieYear).slice(-2)}
+                            </span>
+                          )}
+                          {!team.active && (
+                            <span className="px-1 py-0.2 rounded text-[9px] bg-muted text-muted-foreground">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="font-medium max-w-[220px]" title={team.name}>
                         <div className="truncate font-semibold">{team.name}</div>
@@ -724,6 +748,16 @@ export default function GlobalStatisticsPage() {
                         <span className="text-[10px] text-muted-foreground block">
                           {formatPct(filters.year === "all" ? team.careerRecord?.winrate : year?.record?.winrate)}
                         </span>
+                        {(filters.year === "all" ? team.careerRecord?.winrate : year?.record?.winrate) != null && (
+                          <div className="w-12 h-1 bg-muted rounded-full overflow-hidden mx-auto mt-1 flex">
+                            <div
+                              style={{
+                                width: `${Math.round(((filters.year === "all" ? team.careerRecord?.winrate : year?.record?.winrate) ?? 0) * 100)}%`,
+                              }}
+                              className="bg-emerald-500 h-full"
+                            />
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-center font-bold text-primary">
                         {formatNum(year?.epaTotal ?? team.normEpa?.current)}
@@ -736,6 +770,9 @@ export default function GlobalStatisticsPage() {
                       </TableCell>
                       <TableCell className="text-center text-xs hidden md:table-cell">
                         {formatNum(year?.epaEndgame)}
+                      </TableCell>
+                      <TableCell className="text-center text-xs font-semibold text-amber-500 hidden md:table-cell">
+                        {formatNum(year?.epaMax ?? team.normEpa?.max)}
                       </TableCell>
                       <TableCell className="text-center text-xs hidden lg:table-cell">
                         {year?.ranks.worldRank ? (
@@ -873,6 +910,75 @@ export default function GlobalStatisticsPage() {
               />
             </div>
 
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">FIRST District</Label>
+              <GenericSelector
+                label="District"
+                value={filters.district || "all"}
+                onValueChange={(val) => setFilters((prev) => ({ ...prev, district: val }))}
+                availableOptions={districtOptions}
+                displayFormat={(val) => (val === "all" ? "All Districts & Regionals" : `District ${val}`)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Sort By</Label>
+              <GenericSelector
+                label="Sort Field"
+                value={filters.sortField || "epa"}
+                onValueChange={(val) =>
+                  setFilters((prev) => ({ ...prev, sortField: val as GlobalStatsSortField }))
+                }
+                availableOptions={[
+                  "epa",
+                  "epaMax",
+                  "winrate",
+                  "worldRank",
+                  "countryRank",
+                  "district",
+                  "rookieYear",
+                  "awards",
+                  "auto",
+                  "teleop",
+                  "endgame",
+                  "teamNumber",
+                  "name",
+                ]}
+                displayFormat={(val) => {
+                  switch (val) {
+                    case "epa":
+                      return "Total EPA (Highest first)";
+                    case "epaMax":
+                      return "Peak EPA (Highest first)";
+                    case "winrate":
+                      return "Win Rate (Highest first)";
+                    case "worldRank":
+                      return "World Rank (Best #1 first)";
+                    case "countryRank":
+                      return "Country Rank (Best #1 first)";
+                    case "district":
+                      return "FIRST District";
+                    case "rookieYear":
+                      return "Rookie Year";
+                    case "awards":
+                      return "Most Awards Won";
+                    case "auto":
+                      return "Auto EPA";
+                    case "teleop":
+                      return "Teleop EPA";
+                    case "endgame":
+                      return "Endgame EPA";
+                    case "teamNumber":
+                      return "Team Number";
+                    case "name":
+                      return "Team Name (A-Z)";
+                    default:
+                      return val;
+                  }
+                }}
+              />
+            </div>
+
             <div className="space-y-2 pt-2 border-t">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <Checkbox
@@ -936,6 +1042,11 @@ export default function GlobalStatisticsPage() {
                         <Badge variant="secondary" className="text-xs">Inactive</Badge>
                       )}
                     </div>
+                    {(selectedTeam.fullName || enrichedFirstData?.nameFull) && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 max-w-xl">
+                        {selectedTeam.fullName || enrichedFirstData?.nameFull}
+                      </p>
+                    )}
                     <DialogDescription className="text-sm mt-1">
                       {formatTeamLocation(selectedTeam)}
                       {selectedTeam.rookieYear ? ` · Rookie ${selectedTeam.rookieYear}` : ""}
@@ -943,9 +1054,9 @@ export default function GlobalStatisticsPage() {
                     </DialogDescription>
                     {(selectedTeam.districtCode || selectedTeam.schoolName || selectedTeam.robotName || enrichedFirstData?.robotName || enrichedFirstData?.schoolName) && (
                       <div className="flex flex-wrap items-center gap-2 mt-2 pt-1 border-t border-border/50 text-xs">
-                        {selectedTeam.districtCode && (
+                        {(selectedTeam.districtCode || enrichedFirstData?.districtCode) && (
                           <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono font-medium px-2 py-0.5 rounded border border-amber-500/20">
-                            District: {selectedTeam.districtCode}
+                            District: {selectedTeam.districtCode || enrichedFirstData?.districtCode}
                           </span>
                         )}
                         {(selectedTeam.robotName || enrichedFirstData?.robotName) && (
@@ -963,7 +1074,24 @@ export default function GlobalStatisticsPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {(selectedTeam.website || enrichedFirstData?.website) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs gap-1"
+                        asChild
+                      >
+                        <a
+                          href={selectedTeam.website || enrichedFirstData?.website || "#"}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Globe2 className="h-3 w-3" />
+                          Website
+                        </a>
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
@@ -1018,17 +1146,57 @@ export default function GlobalStatisticsPage() {
                 <Card className="bg-muted/40 p-3">
                   <div className="text-xs text-muted-foreground">Career Record</div>
                   <div className="text-lg font-bold">{formatRecord(selectedTeam.careerRecord)}</div>
-                  <div className="text-xs text-muted-foreground">{formatPct(selectedTeam.careerRecord?.winrate)} Winrate</div>
+                  <div className="text-xs text-muted-foreground flex items-center justify-between mt-0.5">
+                    <span>{formatPct(selectedTeam.careerRecord?.winrate)} Winrate</span>
+                    <span>
+                      {selectedTeam.careerRecord
+                        ? selectedTeam.careerRecord.wins + selectedTeam.careerRecord.losses + selectedTeam.careerRecord.ties
+                        : 0}{" "}
+                      Matches
+                    </span>
+                  </div>
+                  {selectedTeam.careerRecord && selectedTeam.careerRecord.count > 0 && (
+                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-2 flex">
+                      <div
+                        style={{
+                          width: `${(selectedTeam.careerRecord.wins / selectedTeam.careerRecord.count) * 100}%`,
+                        }}
+                        className="bg-emerald-500 h-full"
+                        title="Wins"
+                      />
+                      <div
+                        style={{
+                          width: `${(selectedTeam.careerRecord.ties / selectedTeam.careerRecord.count) * 100}%`,
+                        }}
+                        className="bg-amber-400 h-full"
+                        title="Ties"
+                      />
+                      <div
+                        style={{
+                          width: `${(selectedTeam.careerRecord.losses / selectedTeam.careerRecord.count) * 100}%`,
+                        }}
+                        className="bg-rose-500 h-full"
+                        title="Losses"
+                      />
+                    </div>
+                  )}
                 </Card>
 
                 <Card className="bg-muted/40 p-3">
-                  <div className="text-xs text-muted-foreground">Norm EPA (Current)</div>
+                  <div className="text-xs text-muted-foreground">Scoring Power (Norm EPA)</div>
                   <div className="text-lg font-bold text-primary">
                     {formatNum(selectedTeam.normEpa?.current, 0)}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Peak: {formatNum(selectedTeam.normEpa?.max, 0)} · Mean: {formatNum(selectedTeam.normEpa?.mean, 0)}
+                    Peak: <span className="font-semibold text-amber-500">{formatNum(selectedTeam.normEpa?.max, 0)}</span> · Mean: {formatNum(selectedTeam.normEpa?.mean, 0)}
                   </div>
+                  {selectedTeam.years.length > 0 && (
+                    <div className="flex items-center gap-2 mt-2 pt-1 border-t border-border/40 text-[10px] text-muted-foreground">
+                      <span>Auto: <strong className="text-foreground">{formatNum(selectedTeam.years[selectedTeam.years.length - 1]?.epaAuto, 1)}</strong></span>
+                      <span>Teleop: <strong className="text-foreground">{formatNum(selectedTeam.years[selectedTeam.years.length - 1]?.epaTeleop, 1)}</strong></span>
+                      <span>End: <strong className="text-foreground">{formatNum(selectedTeam.years[selectedTeam.years.length - 1]?.epaEndgame, 1)}</strong></span>
+                    </div>
+                  )}
                 </Card>
 
                 <Card className="bg-muted/40 p-3">
@@ -1037,15 +1205,52 @@ export default function GlobalStatisticsPage() {
                   <div className="text-xs text-muted-foreground">
                     {selectedTeam.years[0]?.year} – {selectedTeam.years[selectedTeam.years.length - 1]?.year}
                   </div>
+                  <div className="text-[10px] text-muted-foreground mt-2 pt-1 border-t border-border/40">
+                    {selectedTeam.districtCode ? `District: ${selectedTeam.districtCode}` : "Regional Division"}
+                    {selectedTeam.rookieYear ? ` · Est. ${selectedTeam.rookieYear}` : ""}
+                  </div>
                 </Card>
 
                 <Card className="bg-muted/40 p-3">
-                  <div className="text-xs text-muted-foreground">Awards Won</div>
+                  <div className="text-xs text-muted-foreground">Awards & Ranks</div>
                   <div className="text-lg font-bold text-amber-500 flex items-center gap-1.5">
                     <Trophy className="h-4 w-4" />
-                    {selectedTeam.awards?.length ?? 0}
+                    {selectedTeam.awards?.length ?? 0} Awards
                   </div>
-                  <div className="text-xs text-muted-foreground">FRC Official Accolades</div>
+                  <div className="text-[11px] text-muted-foreground flex flex-col gap-0.5 mt-0.5">
+                    {(() => {
+                      const worldRanks = selectedTeam.years
+                        .map((y) => y.ranks?.worldRank)
+                        .filter((r): r is number => typeof r === "number" && r > 0);
+                      const countryRanks = selectedTeam.years
+                        .map((y) => y.ranks?.countryRank)
+                        .filter((r): r is number => typeof r === "number" && r > 0);
+                      const districtRanks = selectedTeam.years
+                        .map((y) => y.ranks?.districtRank)
+                        .filter((r): r is number => typeof r === "number" && r > 0);
+
+                      const bestWorld = worldRanks.length > 0 ? Math.min(...worldRanks) : null;
+                      const bestCountry = countryRanks.length > 0 ? Math.min(...countryRanks) : null;
+                      const bestDistrict = districtRanks.length > 0 ? Math.min(...districtRanks) : null;
+
+                      return (
+                        <>
+                          {bestWorld != null && (
+                            <span>Best World: <strong>#{bestWorld}</strong></span>
+                          )}
+                          {bestCountry != null && (
+                            <span>Best Country: <strong>#{bestCountry}</strong></span>
+                          )}
+                          {bestDistrict != null && (
+                            <span>Best District: <strong>#{bestDistrict}</strong></span>
+                          )}
+                          {bestWorld == null && bestCountry == null && bestDistrict == null && (
+                            <span>Official Accolades</span>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
                 </Card>
               </div>
 

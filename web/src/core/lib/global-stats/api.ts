@@ -23,6 +23,7 @@ interface StatboticsTeamResponse {
   name?: string;
   country?: string;
   state?: string;
+  district?: string | null;
   rookie_year?: number;
   active?: boolean;
   last_active_year?: number;
@@ -41,6 +42,7 @@ interface StatboticsTeamYearResponse {
   name?: string;
   country?: string;
   state?: string;
+  district?: string | null;
   rookie_year?: number;
   epa?: {
     total_points?: number;
@@ -51,18 +53,11 @@ interface StatboticsTeamYearResponse {
     ranks?: {
       total?: { rank?: number; percentile?: number };
       country?: { rank?: number; percentile?: number };
+      district?: { rank?: number; percentile?: number };
+      state?: { rank?: number; percentile?: number };
     };
   };
   record?: StatboticsRecord;
-}
-
-interface TBATeamSimple {
-  team_number?: number;
-  nickname?: string;
-  city?: string;
-  state_prov?: string;
-  country?: string;
-  rookie_year?: number;
 }
 
 interface TBAAward {
@@ -110,6 +105,10 @@ const compactYear = (raw: StatboticsTeamYearResponse): GlobalTeamYear | null => 
     worldPercentile: asNumber(raw.epa?.ranks?.total?.percentile),
     countryRank: asNumber(raw.epa?.ranks?.country?.rank),
     countryPercentile: asNumber(raw.epa?.ranks?.country?.percentile),
+    districtRank: asNumber(raw.epa?.ranks?.district?.rank),
+    districtPercentile: asNumber(raw.epa?.ranks?.district?.percentile),
+    stateRank: asNumber(raw.epa?.ranks?.state?.rank),
+    statePercentile: asNumber(raw.epa?.ranks?.state?.percentile),
   };
   return {
     year,
@@ -201,12 +200,54 @@ export async function syncSeasonFromStatbotics(
 }
 
 export async function fetchGlobalTeamFromApis(teamNumber: number): Promise<GlobalTeamProfile> {
-  const [statboticsTeam, teamYears, tbaTeam, tbaAwards] = await Promise.all([
-    proxyGetJson<StatboticsTeamResponse>("statbotics", `/team/${teamNumber}`),
-    proxyGetJson<StatboticsTeamYearResponse[]>("statbotics", `/team_years?team=${teamNumber}&limit=1000`),
-    proxyGetJson<TBATeamSimple>("tba", `/team/frc${teamNumber}/simple`).catch(() => null),
+  const currentSeason = new Date().getFullYear();
+  const [statboticsTeam, teamYears, tbaTeam, tbaAwards, firstTeamResp] = await Promise.all([
+    proxyGetJson<StatboticsTeamResponse>("statbotics", `/team/${teamNumber}`).catch(() => null),
+    proxyGetJson<StatboticsTeamYearResponse[]>("statbotics", `/team_years?team=${teamNumber}&limit=1000`).catch(() => []),
+    proxyGetJson<{
+      key?: string;
+      nickname?: string;
+      name?: string;
+      city?: string;
+      state_prov?: string;
+      country?: string;
+      rookie_year?: number;
+      website?: string;
+      postal_code?: string;
+      school_name?: string;
+    }>("tba", `/team/frc${teamNumber}`).catch(() => null),
     proxyGetJson<TBAAward[]>("tba", `/team/frc${teamNumber}/awards`).catch(() => []),
+    proxyGetJson<{
+      teams?: Array<{
+        teamNumber: number;
+        nameShort?: string;
+        nameFull?: string;
+        schoolName?: string | null;
+        robotName?: string | null;
+        districtCode?: string | null;
+        city?: string;
+        stateProv?: string;
+        country?: string;
+        rookieYear?: number;
+        website?: string;
+      }>;
+      Teams?: Array<{
+        teamNumber: number;
+        nameShort?: string;
+        nameFull?: string;
+        schoolName?: string | null;
+        robotName?: string | null;
+        districtCode?: string | null;
+        city?: string;
+        stateProv?: string;
+        country?: string;
+        rookieYear?: number;
+        website?: string;
+      }>;
+    }>("first", `/${currentSeason}/teams?teamNumber=${teamNumber}`).catch(() => null),
   ]);
+
+  const firstTeam = firstTeamResp?.teams?.[0] || firstTeamResp?.Teams?.[0];
 
   const years = (Array.isArray(teamYears) ? teamYears : [])
     .map(compactYear)
@@ -221,20 +262,32 @@ export async function fetchGlobalTeamFromApis(teamNumber: number): Promise<Globa
     }))
     .filter((award) => award.year > 0);
 
+  const district = (firstTeam?.districtCode?.trim() || statboticsTeam?.district?.toUpperCase() || null);
+  const school = (firstTeam?.schoolName?.trim() || tbaTeam?.school_name?.trim() || null);
+  const robot = (firstTeam?.robotName?.trim() || null);
+  const fullName = (firstTeam?.nameFull?.trim() || tbaTeam?.name?.trim() || null);
+  const website = (firstTeam?.website?.trim() || tbaTeam?.website?.trim() || null);
+
   return {
     teamNumber,
-    name: tbaTeam?.nickname || statboticsTeam?.name || `Team ${teamNumber}`,
-    city: tbaTeam?.city,
-    state: tbaTeam?.state_prov || statboticsTeam?.state,
-    country: tbaTeam?.country || statboticsTeam?.country,
-    rookieYear: tbaTeam?.rookie_year || statboticsTeam?.rookie_year,
+    name: firstTeam?.nameShort || tbaTeam?.nickname || statboticsTeam?.name || `Team ${teamNumber}`,
+    fullName,
+    schoolName: school,
+    robotName: robot,
+    districtCode: district,
+    city: firstTeam?.city || tbaTeam?.city,
+    state: firstTeam?.stateProv || tbaTeam?.state_prov || statboticsTeam?.state,
+    country: firstTeam?.country || tbaTeam?.country || statboticsTeam?.country,
+    postalCode: tbaTeam?.postal_code || null,
+    website,
+    rookieYear: firstTeam?.rookieYear || tbaTeam?.rookie_year || statboticsTeam?.rookie_year,
     active: Boolean(statboticsTeam?.active),
     lastActiveYear: statboticsTeam?.last_active_year,
     careerRecord: compactRecord(statboticsTeam?.record),
     normEpa: compactNormEpa(statboticsTeam?.norm_epa),
     years,
     awards,
-    source: "online",
+    source: firstTeam ? "first" : "online",
     updatedAt: Date.now(),
   };
 }

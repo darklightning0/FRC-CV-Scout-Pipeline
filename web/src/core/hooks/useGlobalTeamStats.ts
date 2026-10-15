@@ -10,6 +10,7 @@ const DEFAULT_FILTERS: GlobalStatsFilters = {
   search: "",
   country: "all",
   city: "all",
+  district: "all",
   year: "all",
   activeOnly: false,
   offlineOnly: false,
@@ -137,6 +138,10 @@ export function useGlobalTeamStats() {
           valA = yearA?.epaEndgame ?? -9999;
           valB = yearB?.epaEndgame ?? -9999;
           break;
+        case "epaMax":
+          valA = yearA?.epaMax ?? a.normEpa?.max ?? -9999;
+          valB = yearB?.epaMax ?? b.normEpa?.max ?? -9999;
+          break;
         case "winrate": {
           const recA = filters.year === "all" ? a.careerRecord : yearA?.record;
           const recB = filters.year === "all" ? b.careerRecord : yearB?.record;
@@ -153,6 +158,14 @@ export function useGlobalTeamStats() {
           valA = yearA?.ranks?.countryRank ?? 999999;
           valB = yearB?.ranks?.countryRank ?? 999999;
           return (Number(valA) - Number(valB)) * (sortDirection === "asc" ? -1 : 1) * dir;
+        case "district":
+          valA = a.districtCode ?? "";
+          valB = b.districtCode ?? "";
+          break;
+        case "rookieYear":
+          valA = a.rookieYear ?? 9999;
+          valB = b.rookieYear ?? 9999;
+          break;
         case "teamNumber":
           return (a.teamNumber - b.teamNumber) * dir;
         case "name":
@@ -219,6 +232,14 @@ export function useGlobalTeamStats() {
       for (const year of team.years) years.add(year.year);
     }
     return [...years].sort((a, b) => b - a);
+  }, [teams]);
+
+  const districtOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const team of teams) {
+      if (team.districtCode) set.add(team.districtCode.toUpperCase());
+    }
+    return ["all", ...Array.from(set).sort()];
   }, [teams]);
 
   const toggleSort = useCallback((field: GlobalStatsSortField) => {
@@ -389,6 +410,112 @@ export function useGlobalTeamStats() {
     [filters.year, teams]
   );
 
+  const syncAll = useCallback(
+    async (targetSeason?: number) => {
+      const yearToSync =
+        targetSeason ??
+        (filters.year !== "all" && Number.isFinite(Number(filters.year))
+          ? Number(filters.year)
+          : 2026);
+
+      setSyncLoading(true);
+      setError(null);
+
+      try {
+        const [statResult, firstResult] = await Promise.allSettled([
+          syncSeasonFromStatbotics(yearToSync),
+          syncSeasonFromFirstApi(yearToSync),
+        ]);
+
+        const existingMap = new Map(teams.map((t) => [t.teamNumber, t]));
+
+        if (statResult.status === "fulfilled" && statResult.value.count > 0) {
+          statResult.value.records.forEach((seasonYear, teamNum) => {
+            const existing = existingMap.get(teamNum);
+            if (existing) {
+              const filteredYears = existing.years.filter((y) => y.year !== yearToSync);
+              const updatedYears = [...filteredYears, seasonYear].sort((a, b) => a.year - b.year);
+              const updatedTeam: GlobalTeamProfile = {
+                ...existing,
+                years: updatedYears,
+                updatedAt: Date.now(),
+              };
+              if (seasonYear.epaNorm != null) {
+                updatedTeam.normEpa = {
+                  ...existing.normEpa,
+                  current: seasonYear.epaNorm,
+                };
+              }
+              existingMap.set(teamNum, updatedTeam);
+            } else {
+              existingMap.set(teamNum, {
+                teamNumber: teamNum,
+                name: seasonYear.name || `Team ${teamNum}`,
+                years: [seasonYear],
+                active: true,
+                source: "online",
+                updatedAt: Date.now(),
+              });
+            }
+          });
+        }
+
+        if (firstResult.status === "fulfilled" && firstResult.value.count > 0) {
+          firstResult.value.teams.forEach((firstTeam, teamNum) => {
+            const existing = existingMap.get(teamNum);
+            if (existing) {
+              existingMap.set(teamNum, {
+                ...existing,
+                schoolName: firstTeam.schoolName || existing.schoolName,
+                robotName: firstTeam.robotName || existing.robotName,
+                districtCode: firstTeam.districtCode || existing.districtCode,
+                source: "first",
+                updatedAt: Date.now(),
+              });
+            } else {
+              existingMap.set(teamNum, {
+                teamNumber: teamNum,
+                name: firstTeam.nameShort || `Team ${teamNum}`,
+                city: firstTeam.city,
+                state: firstTeam.stateProv,
+                country: firstTeam.country,
+                districtCode: firstTeam.districtCode,
+                schoolName: firstTeam.schoolName,
+                robotName: firstTeam.robotName,
+                rookieYear: firstTeam.rookieYear,
+                years: [],
+                active: true,
+                source: "first",
+                updatedAt: Date.now(),
+              });
+            }
+          });
+        }
+
+        const mergedAll = Array.from(existingMap.values());
+        await putCachedGlobalTeams(mergedAll);
+        setTeams(mergedAll);
+
+        const statCount = statResult.status === "fulfilled" ? statResult.value.count : 0;
+        const firstCount = firstResult.status === "fulfilled" ? firstResult.value.count : 0;
+
+        return {
+          updated: Math.max(statCount, firstCount),
+          statCount,
+          firstCount,
+          year: yearToSync,
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to sync season data";
+        setError(message);
+        return { updated: 0, error: message };
+      } finally {
+        setSyncLoading(false);
+      }
+    },
+    [filters.year, teams]
+  );
+
   return {
     teams,
     filteredTeams,
@@ -401,12 +528,14 @@ export function useGlobalTeamStats() {
     bundleGeneratedAt,
     countryOptions,
     cityOptions,
+    districtOptions,
     yearOptions,
     toggleSort,
     resetFilters,
     lookupTeam,
     syncStatbotics,
     syncFirstApi,
+    syncAll,
   };
 }
 
