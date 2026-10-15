@@ -7,12 +7,13 @@
  *   NEXUS_API_KEY or NEXUS_AUTH_KEY or VITE_NEXUS_API_KEY
  */
 
-type Provider = 'tba' | 'nexus' | 'statbotics';
+type Provider = 'tba' | 'nexus' | 'statbotics' | 'first';
 
 const TBA_BASE_URL = 'https://www.thebluealliance.com/api/v3';
 const NEXUS_BASE_URL = 'https://frc.nexus/api/v1';
 const STATBOTICS_BASE_URL = 'https://api.statbotics.io/v3';
 const STATBOTICS_FALLBACK_BASE_URL = 'https://api-statbotics.iterativerefinement.com/v3';
+const FIRST_BASE_URL = 'https://frc-api.firstinspires.org/v3.0';
 
 const tbaAllowed = [
   /^\/events\/\d+(?:\/simple)?$/,
@@ -31,9 +32,19 @@ const nexusAllowed = [
 
 const statboticsAllowed = [/^\/team_event\/\d+\/[a-z0-9]+$/i];
 
+const firstAllowed = [
+  /^\/\d{4}\/(?:teams|events|matches|scores|rankings|awards|districts)(?:\/.*)?$/i,
+];
+
 function isAllowedEndpoint(provider: Provider, endpoint: string): boolean {
   const rules =
-    provider === 'tba' ? tbaAllowed : provider === 'nexus' ? nexusAllowed : statboticsAllowed;
+    provider === 'tba'
+      ? tbaAllowed
+      : provider === 'nexus'
+        ? nexusAllowed
+        : provider === 'statbotics'
+          ? statboticsAllowed
+          : firstAllowed;
   return rules.some((rule) => rule.test(endpoint));
 }
 
@@ -43,6 +54,21 @@ function getServerApiKey(env: Record<string, string | undefined>, provider: Prov
   }
   if (provider === 'nexus') {
     return env.NEXUS_API_KEY || env.NEXUS_AUTH_KEY || env.VITE_NEXUS_API_KEY || '';
+  }
+  if (provider === 'first') {
+    if (env.FIRST_API_KEY || env.VITE_FIRST_API_KEY) {
+      return env.FIRST_API_KEY || env.VITE_FIRST_API_KEY || '';
+    }
+    const username = env.FIRST_API_USERNAME || env.VITE_FIRST_API_USERNAME || '';
+    const token = env.FIRST_API_TOKEN || env.VITE_FIRST_API_TOKEN || '';
+    if (username && token) {
+      try {
+        return btoa(`${username}:${token}`);
+      } catch {
+        return '';
+      }
+    }
+    return '';
   }
   return env.STATBOTICS_API_KEY || env.VITE_STATBOTICS_API_KEY || '';
 }
@@ -97,7 +123,13 @@ export async function onRequest(context: {
     }
 
     const baseUrl =
-      provider === 'tba' ? TBA_BASE_URL : provider === 'nexus' ? NEXUS_BASE_URL : STATBOTICS_BASE_URL;
+      provider === 'tba'
+        ? TBA_BASE_URL
+        : provider === 'nexus'
+          ? NEXUS_BASE_URL
+          : provider === 'first'
+            ? FIRST_BASE_URL
+            : STATBOTICS_BASE_URL;
 
     const upstreamHeaders: Record<string, string> = {
       Accept: 'application/json',
@@ -105,9 +137,11 @@ export async function onRequest(context: {
         ? { 'X-TBA-Auth-Key': apiKey }
         : provider === 'nexus'
           ? { 'Nexus-Api-Key': apiKey }
-          : apiKey
-            ? { Authorization: `Bearer ${apiKey}` }
-            : {}),
+          : provider === 'first'
+            ? { Authorization: `Basic ${apiKey}` }
+            : apiKey
+              ? { Authorization: `Bearer ${apiKey}` }
+              : {}),
     };
 
     const fetchUpstream = async (base: string) => {

@@ -2,7 +2,7 @@ import React from 'react';
 import { ExternalLink } from 'lucide-react';
 
 interface DataAttributionProps {
-  sources: ('tba' | 'nexus' | 'statbotics')[];
+  sources: ('tba' | 'nexus' | 'statbotics' | 'first')[];
   variant?: 'full' | 'compact' | 'inline';
   className?: string;
 }
@@ -15,6 +15,7 @@ export const DataAttribution: React.FC<DataAttributionProps> = ({
   const showTBA = sources.includes('tba');
   const showNexus = sources.includes('nexus');
   const showStatbotics = sources.includes('statbotics');
+  const showFirst = sources.includes('first');
 
   if (variant === 'full') {
     return (
@@ -61,6 +62,20 @@ export const DataAttribution: React.FC<DataAttributionProps> = ({
             </a>
           </div>
         )}
+        {showFirst && (
+          <div className="flex items-center gap-1">
+            <span>Official data from</span>
+            <a
+              href="https://frc-events.firstinspires.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 underline flex items-center gap-1"
+            >
+              FIRST Inspires
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        )}
       </div>
     );
   }
@@ -103,6 +118,19 @@ export const DataAttribution: React.FC<DataAttributionProps> = ({
           className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 underline"
         >
           Statbotics
+        </a>
+      );
+    }
+    if (showFirst) {
+      attributions.push(
+        <a
+          key="first"
+          href="https://frc-events.firstinspires.org"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 underline"
+        >
+          FIRST Inspires
         </a>
       );
     }
@@ -153,6 +181,18 @@ export const DataAttribution: React.FC<DataAttributionProps> = ({
           title="EPA data from Statbotics"
         >
           Statbotics
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
+      {showFirst && (
+        <a
+          href="https://frc-events.firstinspires.org"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 underline flex items-center gap-1"
+          title="Official data from FIRST Inspires"
+        >
+          FIRST<span className="hidden sm:inline"> Inspires</span>
           <ExternalLink className="h-3 w-3" />
         </a>
       )}

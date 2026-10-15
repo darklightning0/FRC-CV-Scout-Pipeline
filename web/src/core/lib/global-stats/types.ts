@@ -54,6 +54,8 @@ export interface GlobalTeamProfile {
   lastActiveYear?: number | null;
   careerRecord?: GlobalTeamRecord | null;
   normEpa?: GlobalNormEpa | null;
+  robotName?: string | null;
+  schoolName?: string | null;
   years: GlobalTeamYear[];
   awards?: GlobalTeamAward[];
   source: GlobalStatsSource;

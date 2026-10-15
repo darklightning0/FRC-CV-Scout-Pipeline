@@ -17,12 +17,14 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Bot,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card";
 import { DataAttribution } from "@/core/components/DataAttribution";
+import { fetchFirstTeam } from "@/core/lib/first/api";
 import { GenericSelector } from "@/core/components/ui/generic-selector";
 import { Input } from "@/core/components/ui/input";
 import { Label } from "@/core/components/ui/label";
@@ -152,8 +154,32 @@ export default function GlobalStatisticsPage() {
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<GlobalTeamProfile | null>(null);
+  const [enrichedFirstData, setEnrichedFirstData] = useState<{ robotName?: string | null; schoolName?: string | null } | null>(null);
   const [lookupValue, setLookupValue] = useState("");
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+
+  useEffect(() => {
+    if (!selectedTeam) {
+      setEnrichedFirstData(null);
+      return;
+    }
+    if (selectedTeam.robotName || selectedTeam.schoolName) {
+      setEnrichedFirstData({ robotName: selectedTeam.robotName, schoolName: selectedTeam.schoolName });
+      return;
+    }
+    const season = selectedTeam.lastActiveYear || 2026;
+    let cancelled = false;
+    fetchFirstTeam(season, selectedTeam.teamNumber)
+      .then((data) => {
+        if (!cancelled && data) {
+          setEnrichedFirstData({ robotName: data.robotName, schoolName: data.schoolName });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTeam]);
 
   const handleSyncStatbotics = async () => {
     const targetYear =
@@ -290,7 +316,7 @@ export default function GlobalStatisticsPage() {
               <RefreshCw className={`h-3.5 w-3.5 ${syncLoading ? "animate-spin text-primary" : "text-muted-foreground"}`} />
               {syncLoading ? "Syncing..." : `Sync Statbotics (${filters.year === "all" ? "2026" : filters.year})`}
             </Button>
-            <DataAttribution sources={["tba", "statbotics"]} variant="compact" />
+            <DataAttribution sources={["tba", "statbotics", "first"]} variant="compact" />
           </div>
         </div>
 
@@ -857,6 +883,21 @@ export default function GlobalStatisticsPage() {
                       {selectedTeam.rookieYear ? ` · Rookie ${selectedTeam.rookieYear}` : ""}
                       {selectedTeam.lastActiveYear ? ` · Last Active ${selectedTeam.lastActiveYear}` : ""}
                     </DialogDescription>
+                    {(enrichedFirstData?.robotName || enrichedFirstData?.schoolName) && (
+                      <div className="flex flex-wrap items-center gap-2 mt-2 pt-1 border-t border-border/50 text-xs">
+                        {enrichedFirstData.robotName && (
+                          <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium px-2 py-0.5 rounded border border-amber-500/20">
+                            <Bot className="h-3 w-3" />
+                            Robot: {enrichedFirstData.robotName}
+                          </span>
+                        )}
+                        {enrichedFirstData.schoolName && (
+                          <span className="text-muted-foreground truncate max-w-md">
+                            🏫 {enrichedFirstData.schoolName}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -888,6 +929,21 @@ export default function GlobalStatisticsPage() {
                       >
                         <ExternalLink className="h-3 w-3" />
                         Statbotics
+                      </a>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs gap-1 text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                      asChild
+                    >
+                      <a
+                        href={`https://frc-events.firstinspires.org/team/${selectedTeam.teamNumber}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        FIRST
                       </a>
                     </Button>
                   </div>

@@ -1,4 +1,4 @@
-type ApiProvider = 'tba' | 'nexus' | 'statbotics';
+type ApiProvider = 'tba' | 'nexus' | 'statbotics' | 'first';
 
 interface ProxyRequestOptions {
   apiKeyOverride?: string;
@@ -7,6 +7,21 @@ interface ProxyRequestOptions {
 function getProxyPaths(): string[] {
   // Cloudflare Pages Function first, then Netlify (legacy), then empty base relative.
   return ['/api-proxy', '/.netlify/functions/api-proxy'];
+}
+
+function getFirstBasicAuth(): string {
+  const directKey = (import.meta.env.VITE_FIRST_API_KEY as string | undefined) || '';
+  if (directKey) return directKey;
+  const username = (import.meta.env.VITE_FIRST_API_USERNAME as string | undefined) || '';
+  const token = (import.meta.env.VITE_FIRST_API_TOKEN as string | undefined) || '';
+  if (username && token) {
+    try {
+      return btoa(`${username}:${token}`);
+    } catch {
+      return '';
+    }
+  }
+  return '';
 }
 
 export async function proxyGetJson<T>(
@@ -24,7 +39,9 @@ export async function proxyGetJson<T>(
       ? (import.meta.env.VITE_TBA_API_KEY as string | undefined)
       : provider === 'nexus'
         ? (import.meta.env.VITE_NEXUS_API_KEY as string | undefined)
-        : undefined;
+        : provider === 'first'
+          ? getFirstBasicAuth()
+          : undefined;
 
   const apiKey = options.apiKeyOverride || envFallbackKey || '';
   const headers: Record<string, string> = {
@@ -116,6 +133,19 @@ export async function proxyGetJson<T>(
         /* try next */
       }
     }
+  }
+
+  if (provider === 'first') {
+    const directUrl = `https://frc-api.firstinspires.org/v3.0${endpoint}`;
+    const directRes = await fetch(directUrl, {
+      headers: {
+        Authorization: `Basic ${apiKey}`,
+        Accept: 'application/json',
+      },
+    });
+    if (directRes.ok) return (await directRes.json()) as T;
+    const errText = await directRes.text();
+    throw new Error(`FIRST API direct request failed (${directRes.status}): ${errText.slice(0, 120)}`);
   }
 
   throw lastError instanceof Error ? lastError : new Error('API proxy unavailable');
