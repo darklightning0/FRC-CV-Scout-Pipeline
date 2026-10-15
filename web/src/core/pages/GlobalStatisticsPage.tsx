@@ -114,11 +114,11 @@ function TeamYearTable({ years }: { years: GlobalTeamYear[] }) {
               <TableCell>{formatNum(year.epaEndgame)}</TableCell>
               <TableCell>{formatRecord(year.record)}</TableCell>
               <TableCell>{formatPct(year.record?.winrate)}</TableCell>
-              <TableCell>{year.ranks.worldRank ? `#${year.ranks.worldRank}` : "—"}</TableCell>
-              <TableCell>{year.ranks.countryRank ? `#${year.ranks.countryRank}` : "—"}</TableCell>
+              <TableCell>{year.ranks?.worldRank ? `#${year.ranks.worldRank}` : "—"}</TableCell>
+              <TableCell>{year.ranks?.countryRank ? `#${year.ranks.countryRank}` : "—"}</TableCell>
               {extraKeys.slice(0, 10).map((key) => (
                 <TableCell key={key} className="text-xs">
-                  {formatNum(year.breakdown[key], 2)}
+                  {formatNum(year.breakdown?.[key], 2)}
                 </TableCell>
               ))}
             </TableRow>

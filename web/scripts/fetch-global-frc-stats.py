@@ -271,7 +271,57 @@ def main() -> None:
 
     for num in sorted(teams.keys()):
         team = teams[num]
-        years_list = sorted(team_years_map.get(num, []), key=lambda x: x["year"])
+        ne = team.get("normEpa")
+        if ne:
+            for k in ["current", "recent", "mean", "max"]:
+                if ne.get(k) is not None:
+                    ne[k] = round(ne[k], 1)
+        cr = team.get("careerRecord")
+        if cr:
+            if cr.get("count") == 0:
+                team.pop("careerRecord", None)
+            elif cr.get("winrate") is not None:
+                cr["winrate"] = round(cr["winrate"], 3)
+
+        raw_years = sorted(team_years_map.get(num, []), key=lambda x: x["year"])
+        years_list = []
+        for idx, y in enumerate(raw_years):
+            is_latest = idx == len(raw_years) - 1
+            if y.get("name") == team.get("name"):
+                y.pop("name", None)
+            y.pop("epaUnitless", None)
+            y.pop("epaMax", None)
+            y.pop("epaNorm", None)
+
+            for epa_k in ["epaTotal", "epaAuto", "epaTeleop", "epaEndgame"]:
+                if y.get(epa_k) is not None:
+                    y[epa_k] = round(y[epa_k], 1)
+
+            if not is_latest:
+                y["breakdown"] = {}
+            elif "breakdown" in y:
+                for dup in ["total_points", "auto_points", "teleop_points", "endgame_points"]:
+                    y["breakdown"].pop(dup, None)
+                cleaned_bd = {k: round(v, 1) for k, v in y["breakdown"].items() if v and round(v, 1) != 0.0}
+                y["breakdown"] = cleaned_bd
+
+            ranks = y.get("ranks") or {}
+            cr_ranks = {}
+            if ranks.get("worldRank"):
+                cr_ranks["worldRank"] = ranks["worldRank"]
+            if ranks.get("countryRank"):
+                cr_ranks["countryRank"] = ranks["countryRank"]
+            y["ranks"] = cr_ranks
+
+            rec = y.get("record")
+            if rec:
+                if rec.get("count") == 0:
+                    y.pop("record", None)
+                elif rec.get("winrate") is not None:
+                    rec["winrate"] = round(rec["winrate"], 3)
+
+            years_list.append(y)
+
         team["years"] = years_list
         team["updatedAt"] = now
         if num in turkey_awards:
