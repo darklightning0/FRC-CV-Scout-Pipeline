@@ -150,6 +150,7 @@ export default function GlobalStatisticsPage() {
     resetFilters,
     lookupTeam,
     syncStatbotics,
+    syncFirstApi,
   } = useGlobalTeamStats();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -196,6 +197,25 @@ export default function GlobalStatisticsPage() {
       toast.success(
         `Synced ${res.updated} teams for season ${res.year} from Statbotics`,
         { id: "statbotics-sync" }
+      );
+    }
+  };
+
+  const handleSyncFirstApi = async () => {
+    const targetYear =
+      filters.year !== "all" && Number.isFinite(Number(filters.year))
+        ? Number(filters.year)
+        : 2026;
+    toast.loading(`Pulling official ${targetYear} season roster & districts from FIRST API...`, {
+      id: "first-sync",
+    });
+    const res = await syncFirstApi(targetYear);
+    if (res.error) {
+      toast.error(`FIRST API sync failed: ${res.error}`, { id: "first-sync" });
+    } else {
+      toast.success(
+        `Successfully synced ${res.updated} teams for season ${res.year} from FIRST Inspires API!`,
+        { id: "first-sync" }
       );
     }
   };
@@ -316,12 +336,22 @@ export default function GlobalStatisticsPage() {
               <RefreshCw className={`h-3.5 w-3.5 ${syncLoading ? "animate-spin text-primary" : "text-muted-foreground"}`} />
               {syncLoading ? "Syncing..." : `Sync Statbotics (${filters.year === "all" ? "2026" : filters.year})`}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncFirstApi}
+              disabled={syncLoading}
+              className="gap-2 text-xs h-9 border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-500/5 text-amber-600 dark:text-amber-400 shadow-xs"
+            >
+              <Bot className={`h-3.5 w-3.5 ${syncLoading ? "animate-spin text-amber-500" : "text-amber-500"}`} />
+              {syncLoading ? "Syncing..." : `Sync FIRST (${filters.year === "all" ? "2026" : filters.year})`}
+            </Button>
             <DataAttribution sources={["tba", "statbotics", "first"]} variant="compact" />
           </div>
         </div>
 
         {/* KPI Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <Card className="bg-card/50">
             <CardHeader className="p-3 pb-1">
               <CardDescription className="text-xs">Offline Pack</CardDescription>
@@ -334,6 +364,19 @@ export default function GlobalStatisticsPage() {
               {bundleGeneratedAt
                 ? `Global archive updated ${new Date(bundleGeneratedAt).toLocaleDateString()}`
                 : "Full global pack stored locally for zero-latency offline use"}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/50">
+            <CardHeader className="p-3 pb-1">
+              <CardDescription className="text-xs">FIRST Verified</CardDescription>
+              <CardTitle className="text-lg flex items-center gap-2 font-bold text-amber-600 dark:text-amber-400">
+                <Bot className="h-4 w-4 text-amber-500" />
+                {teams.filter((t) => t.schoolName || t.districtCode || t.source === "first").length} Teams
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0 text-[11px] text-muted-foreground">
+              Official schools & districts
             </CardContent>
           </Card>
 
@@ -654,14 +697,24 @@ export default function GlobalStatisticsPage() {
                     >
                       <TableCell className="font-bold text-primary">
                         {team.teamNumber}
+                        {team.districtCode && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-semibold border border-amber-500/30">
+                            {team.districtCode}
+                          </span>
+                        )}
                         {!team.active && (
                           <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] bg-muted text-muted-foreground font-normal">
                             Inactive
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="font-medium max-w-[200px] truncate" title={team.name}>
-                        {team.name}
+                      <TableCell className="font-medium max-w-[220px]" title={team.name}>
+                        <div className="truncate font-semibold">{team.name}</div>
+                        {(team.schoolName || team.robotName) && (
+                          <div className="text-[11px] text-muted-foreground truncate font-normal" title={team.schoolName || undefined}>
+                            {team.robotName ? `🤖 ${team.robotName} · ` : ""}{team.schoolName || ""}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {formatTeamLocation(team)}
@@ -723,7 +776,12 @@ export default function GlobalStatisticsPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {team.source === "offline" ? (
+                        {team.source === "first" ? (
+                          <Badge variant="outline" className="gap-1 text-[10px] whitespace-nowrap border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/5">
+                            <Bot className="h-3 w-3 text-amber-500" />
+                            FIRST
+                          </Badge>
+                        ) : team.source === "offline" ? (
                           <Badge variant="secondary" className="gap-1 text-[10px] whitespace-nowrap">
                             <WifiOff className="h-3 w-3 text-emerald-500" />
                             Offline
@@ -883,17 +941,22 @@ export default function GlobalStatisticsPage() {
                       {selectedTeam.rookieYear ? ` · Rookie ${selectedTeam.rookieYear}` : ""}
                       {selectedTeam.lastActiveYear ? ` · Last Active ${selectedTeam.lastActiveYear}` : ""}
                     </DialogDescription>
-                    {(enrichedFirstData?.robotName || enrichedFirstData?.schoolName) && (
+                    {(selectedTeam.districtCode || selectedTeam.schoolName || selectedTeam.robotName || enrichedFirstData?.robotName || enrichedFirstData?.schoolName) && (
                       <div className="flex flex-wrap items-center gap-2 mt-2 pt-1 border-t border-border/50 text-xs">
-                        {enrichedFirstData.robotName && (
-                          <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium px-2 py-0.5 rounded border border-amber-500/20">
-                            <Bot className="h-3 w-3" />
-                            Robot: {enrichedFirstData.robotName}
+                        {selectedTeam.districtCode && (
+                          <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono font-medium px-2 py-0.5 rounded border border-amber-500/20">
+                            District: {selectedTeam.districtCode}
                           </span>
                         )}
-                        {enrichedFirstData.schoolName && (
+                        {(selectedTeam.robotName || enrichedFirstData?.robotName) && (
+                          <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium px-2 py-0.5 rounded border border-amber-500/20">
+                            <Bot className="h-3 w-3" />
+                            Robot: {selectedTeam.robotName || enrichedFirstData?.robotName}
+                          </span>
+                        )}
+                        {(selectedTeam.schoolName || enrichedFirstData?.schoolName) && (
                           <span className="text-muted-foreground truncate max-w-md">
-                            🏫 {enrichedFirstData.schoolName}
+                            🏫 {selectedTeam.schoolName || enrichedFirstData?.schoolName}
                           </span>
                         )}
                       </div>

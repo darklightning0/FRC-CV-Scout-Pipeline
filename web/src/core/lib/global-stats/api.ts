@@ -238,3 +238,85 @@ export async function fetchGlobalTeamFromApis(teamNumber: number): Promise<Globa
     updatedAt: Date.now(),
   };
 }
+
+export interface FirstSyncTeam {
+  teamNumber: number;
+  nameShort?: string;
+  nameFull?: string;
+  schoolName?: string | null;
+  robotName?: string | null;
+  districtCode?: string | null;
+  city?: string;
+  stateProv?: string;
+  country?: string;
+  rookieYear?: number;
+}
+
+export async function syncSeasonFromFirstApi(
+  season: number,
+  onProgress?: (count: number) => void
+): Promise<{ season: number; teams: Map<number, FirstSyncTeam>; count: number }> {
+  const result = new Map<number, FirstSyncTeam>();
+  let page = 1;
+  let totalPages = 1;
+
+  while (page <= totalPages) {
+    const resp = await proxyGetJson<{
+      teams?: Array<{
+        teamNumber: number;
+        nameShort?: string;
+        nameFull?: string;
+        schoolName?: string | null;
+        robotName?: string | null;
+        districtCode?: string | null;
+        city?: string;
+        stateProv?: string;
+        country?: string;
+        rookieYear?: number;
+      }>;
+      Teams?: Array<{
+        teamNumber: number;
+        nameShort?: string;
+        nameFull?: string;
+        schoolName?: string | null;
+        robotName?: string | null;
+        districtCode?: string | null;
+        city?: string;
+        stateProv?: string;
+        country?: string;
+        rookieYear?: number;
+      }>;
+      pageTotal?: number;
+    }>("first", `/${season}/teams?page=${page}`);
+
+    const pageTeams = resp.teams || resp.Teams || [];
+    totalPages = resp.pageTotal || totalPages;
+
+    for (const t of pageTeams) {
+      if (t.teamNumber) {
+        result.set(t.teamNumber, {
+          teamNumber: t.teamNumber,
+          nameShort: t.nameShort,
+          nameFull: t.nameFull,
+          schoolName: t.schoolName?.trim() || null,
+          robotName: t.robotName?.trim() || null,
+          districtCode: t.districtCode?.trim() || null,
+          city: t.city,
+          stateProv: t.stateProv,
+          country: t.country,
+          rookieYear: t.rookieYear,
+        });
+      }
+    }
+
+    onProgress?.(result.size);
+
+    if (pageTeams.length === 0 || page >= totalPages) {
+      break;
+    }
+    page++;
+  }
+
+  return { season, teams: result, count: result.size };
+}
+

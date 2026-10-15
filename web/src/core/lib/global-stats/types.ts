@@ -41,7 +41,7 @@ export interface GlobalTeamAward {
   eventKey?: string;
 }
 
-export type GlobalStatsSource = "offline" | "online";
+export type GlobalStatsSource = "offline" | "online" | "first";
 
 export interface GlobalTeamProfile {
   teamNumber: number;
@@ -54,6 +54,7 @@ export interface GlobalTeamProfile {
   lastActiveYear?: number | null;
   careerRecord?: GlobalTeamRecord | null;
   normEpa?: GlobalNormEpa | null;
+  districtCode?: string | null;
   robotName?: string | null;
   schoolName?: string | null;
   years: GlobalTeamYear[];

@@ -1,10 +1,11 @@
 import type { Plugin } from 'vite';
 import { loadEnv } from 'vite';
 
-type Provider = 'tba' | 'nexus' | 'statbotics';
+type Provider = 'tba' | 'nexus' | 'statbotics' | 'first';
 
 const TBA_BASE_URL = 'https://www.thebluealliance.com/api/v3';
 const NEXUS_BASE_URL = 'https://frc.nexus/api/v1';
+const FIRST_BASE_URL = 'https://frc-api.firstinspires.org/v3.0';
 const STATBOTICS_BASE_URL = 'https://api.statbotics.io/v3';
 const STATBOTICS_FALLBACK_BASE_URL = 'https://api-statbotics.iterativerefinement.com/v3';
 
@@ -27,15 +28,25 @@ const statboticsAllowed = [
   /^\/team_event\/\d+\/[a-z0-9]+$/i,
 ];
 
+const firstAllowed = [
+  /^\/\d{4}\/(?:teams|events|matches|scores|rankings|awards|districts)(?:\/.*)?$/i,
+];
+
 function isAllowedEndpoint(provider: Provider, endpoint: string): boolean {
   const rules =
-    provider === 'tba' ? tbaAllowed : provider === 'nexus' ? nexusAllowed : statboticsAllowed;
+    provider === 'tba'
+      ? tbaAllowed
+      : provider === 'nexus'
+        ? nexusAllowed
+        : provider === 'first'
+          ? firstAllowed
+          : statboticsAllowed;
   return rules.some((rule) => rule.test(endpoint));
 }
 
 /**
  * Local Vite middleware that mirrors netlify/functions/api-proxy.ts
- * so `npm run dev` (plain Vite) can fetch TBA/Nexus/Statbotics.
+ * so `npm run dev` (plain Vite) can fetch TBA/Nexus/Statbotics/FIRST.
  */
 export function localApiProxyPlugin(mode: string): Plugin {
   const env = loadEnv(mode, process.cwd(), '');
@@ -45,7 +56,10 @@ export function localApiProxyPlugin(mode: string): Plugin {
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const rawUrl = req.url || '';
-        if (!rawUrl.startsWith('/.netlify/functions/api-proxy')) {
+        if (
+          !rawUrl.startsWith('/.netlify/functions/api-proxy') &&
+          !rawUrl.startsWith('/api-proxy')
+        ) {
           next();
           return;
         }
@@ -72,7 +86,12 @@ export function localApiProxyPlugin(mode: string): Plugin {
             return;
           }
 
-          if (provider !== 'tba' && provider !== 'nexus' && provider !== 'statbotics') {
+          if (
+            provider !== 'tba' &&
+            provider !== 'nexus' &&
+            provider !== 'statbotics' &&
+            provider !== 'first'
+          ) {
             res.statusCode = 400;
             res.end(JSON.stringify({ error: 'Invalid provider' }));
             return;
@@ -88,12 +107,24 @@ export function localApiProxyPlugin(mode: string): Plugin {
             (req.headers['x-client-api-key'] as string | undefined) ||
             (req.headers['X-Client-Api-Key'] as string | undefined);
 
-          const envKey =
-            provider === 'tba'
-              ? env.TBA_API_KEY || env.TBA_AUTH_KEY || env.VITE_TBA_API_KEY
-              : provider === 'nexus'
-                ? env.NEXUS_API_KEY || env.NEXUS_AUTH_KEY || env.VITE_NEXUS_API_KEY
-                : env.STATBOTICS_API_KEY || env.VITE_STATBOTICS_API_KEY;
+          let envKey = '';
+          if (provider === 'tba') {
+            envKey = env.TBA_API_KEY || env.TBA_AUTH_KEY || env.VITE_TBA_API_KEY || '';
+          } else if (provider === 'nexus') {
+            envKey = env.NEXUS_API_KEY || env.NEXUS_AUTH_KEY || env.VITE_NEXUS_API_KEY || '';
+          } else if (provider === 'first') {
+            if (env.FIRST_API_KEY || env.VITE_FIRST_API_KEY) {
+              envKey = env.FIRST_API_KEY || env.VITE_FIRST_API_KEY || '';
+            } else {
+              const u = env.FIRST_API_USERNAME || env.VITE_FIRST_API_USERNAME || '';
+              const t = env.FIRST_API_TOKEN || env.VITE_FIRST_API_TOKEN || '';
+              if (u && t) {
+                envKey = Buffer.from(`${u}:${t}`).toString('base64');
+              }
+            }
+          } else {
+            envKey = env.STATBOTICS_API_KEY || env.VITE_STATBOTICS_API_KEY || '';
+          }
 
           const apiKey = headerKey || envKey;
 
@@ -101,7 +132,7 @@ export function localApiProxyPlugin(mode: string): Plugin {
             res.statusCode = 500;
             res.end(
               JSON.stringify({
-                error: `${provider.toUpperCase()} API key not configured. Set VITE_${provider.toUpperCase()}_API_KEY in web/.env`,
+                error: `${provider.toUpperCase()} API key not configured. Set VITE_${provider.toUpperCase()}_API_KEY or VITE_FIRST_API_USERNAME / TOKEN in web/.env`,
               })
             );
             return;
@@ -112,7 +143,9 @@ export function localApiProxyPlugin(mode: string): Plugin {
               ? TBA_BASE_URL
               : provider === 'nexus'
                 ? NEXUS_BASE_URL
-                : env.STATBOTICS_API_BASE || STATBOTICS_BASE_URL;
+                : provider === 'first'
+                  ? FIRST_BASE_URL
+                  : env.STATBOTICS_API_BASE || STATBOTICS_BASE_URL;
           const fallbackBase =
             env.STATBOTICS_API_FALLBACK_BASE || STATBOTICS_FALLBACK_BASE_URL;
 
@@ -122,9 +155,11 @@ export function localApiProxyPlugin(mode: string): Plugin {
               ? { 'X-TBA-Auth-Key': apiKey! }
               : provider === 'nexus'
                 ? { 'Nexus-Api-Key': apiKey! }
-                : apiKey
-                  ? { Authorization: `Bearer ${apiKey}` }
-                  : {}),
+                : provider === 'first'
+                  ? { Authorization: `Basic ${apiKey}` }
+                  : apiKey
+                    ? { Authorization: `Bearer ${apiKey}` }
+                    : {}),
           };
 
           const fetchUpstream = async (base: string) => {

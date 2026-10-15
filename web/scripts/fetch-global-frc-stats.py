@@ -35,6 +35,28 @@ def load_tba_key() -> str:
     return ""
 
 
+def load_first_auth() -> str:
+    if not ENV_PATH.exists():
+        return ""
+    import base64
+    env: dict[str, str] = {}
+    for line in ENV_PATH.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        k, v = stripped.split("=", 1)
+        env[k.strip()] = v.strip().strip("'").strip('"')
+
+    if env.get("FIRST_API_KEY") or env.get("VITE_FIRST_API_KEY"):
+        return env.get("FIRST_API_KEY") or env.get("VITE_FIRST_API_KEY") or ""
+
+    user = env.get("FIRST_API_USERNAME") or env.get("VITE_FIRST_API_USERNAME", "")
+    token = env.get("FIRST_API_TOKEN") or env.get("VITE_FIRST_API_TOKEN", "")
+    if user and token:
+        return base64.b64encode(f"{user}:{token}".encode("utf-8")).decode("ascii")
+    return ""
+
+
 def get_json(url: str, headers: dict[str, str] | None = None) -> object:
     all_headers = {"User-Agent": USER_AGENT}
     if headers:
@@ -328,6 +350,38 @@ def main() -> None:
             team["awards"] = turkey_awards[num]
         total_year_rows += len(years_list)
         final_list.append(team)
+
+    first_auth = load_first_auth()
+    if first_auth:
+        print("Enriching with FIRST Inspires official team roster (schools, districts, robots)...")
+        try:
+            def fetch_first_page(p: int) -> list[dict]:
+                url = f"https://frc-api.firstinspires.org/v3.0/2026/teams?page={p}"
+                req = urllib.request.Request(
+                    url,
+                    headers={"Authorization": f"Basic {first_auth}", "User-Agent": USER_AGENT},
+                )
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    return json.loads(resp.read().decode())["teams"]
+
+            with ThreadPoolExecutor(max_workers=10) as ex:
+                first_pages = list(ex.map(fetch_first_page, range(1, 60)))
+            first_teams = {t["teamNumber"]: t for page in first_pages for t in page}
+            enriched = 0
+            for t in final_list:
+                num = t["teamNumber"]
+                if num in first_teams:
+                    ft = first_teams[num]
+                    if ft.get("schoolName"):
+                        t["schoolName"] = ft["schoolName"].strip()
+                    if ft.get("districtCode"):
+                        t["districtCode"] = ft["districtCode"].strip()
+                    if ft.get("robotName"):
+                        t["robotName"] = ft["robotName"].strip()
+                    enriched += 1
+            print(f"Enriched {enriched} teams with FIRST Inspires metadata!")
+        except Exception as e:
+            print(f"FIRST API enrichment skipped: {e}")
 
     cities = sorted({t["city"] for t in final_list if t.get("city")})
     bundle = {

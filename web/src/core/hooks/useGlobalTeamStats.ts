@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchGlobalTeamFromApis, loadGlobalStatsBundle, syncSeasonFromStatbotics } from "@/core/lib/global-stats/api";
+import { fetchGlobalTeamFromApis, loadGlobalStatsBundle, syncSeasonFromStatbotics, syncSeasonFromFirstApi } from "@/core/lib/global-stats/api";
 import { loadCachedGlobalTeams, putCachedGlobalTeam, putCachedGlobalTeams } from "@/core/lib/global-stats/cache";
 import { canonicalCity, isTurkeyCountry, matchesGlobalStatsFilters, yearForDisplay } from "@/core/lib/global-stats/normalize";
 import type { GlobalStatsFilters, GlobalStatsSortField, GlobalTeamProfile } from "@/core/lib/global-stats/types";
@@ -49,6 +49,9 @@ function mergeTeams(existing: GlobalTeamProfile[], incoming: GlobalTeamProfile[]
       byNumber.set(team.teamNumber, {
         ...previous,
         ...team,
+        districtCode: team.districtCode ?? previous?.districtCode,
+        schoolName: team.schoolName ?? previous?.schoolName,
+        robotName: team.robotName ?? previous?.robotName,
         awards: team.awards?.length ? team.awards : previous?.awards,
         years: team.years.length ? team.years : previous?.years ?? [],
       });
@@ -319,6 +322,73 @@ export function useGlobalTeamStats() {
     [filters.year, teams]
   );
 
+  const syncFirstApi = useCallback(
+    async (targetSeason?: number, onProgress?: (count: number) => void) => {
+      const yearToSync =
+        targetSeason ??
+        (filters.year !== "all" && Number.isFinite(Number(filters.year))
+          ? Number(filters.year)
+          : 2026);
+
+      setSyncLoading(true);
+      setError(null);
+
+      try {
+        const result = await syncSeasonFromFirstApi(yearToSync, onProgress);
+        if (result.count === 0) {
+          return { updated: 0, year: yearToSync };
+        }
+
+        const existingMap = new Map(teams.map((t) => [t.teamNumber, t]));
+        const updatedList: GlobalTeamProfile[] = [];
+
+        result.teams.forEach((firstTeam, teamNum) => {
+          const existing = existingMap.get(teamNum);
+          if (existing) {
+            const updatedTeam: GlobalTeamProfile = {
+              ...existing,
+              schoolName: firstTeam.schoolName || existing.schoolName,
+              robotName: firstTeam.robotName || existing.robotName,
+              districtCode: firstTeam.districtCode || existing.districtCode,
+              source: "first",
+              updatedAt: Date.now(),
+            };
+            updatedList.push(updatedTeam);
+          } else {
+            const newTeam: GlobalTeamProfile = {
+              teamNumber: teamNum,
+              name: firstTeam.nameShort || `Team ${teamNum}`,
+              city: firstTeam.city,
+              state: firstTeam.stateProv,
+              country: firstTeam.country,
+              districtCode: firstTeam.districtCode,
+              schoolName: firstTeam.schoolName,
+              robotName: firstTeam.robotName,
+              rookieYear: firstTeam.rookieYear,
+              years: [],
+              active: true,
+              source: "first",
+              updatedAt: Date.now(),
+            };
+            updatedList.push(newTeam);
+          }
+        });
+
+        await putCachedGlobalTeams(updatedList);
+        setTeams((prev) => mergeTeams(prev, updatedList));
+
+        return { updated: updatedList.length, year: yearToSync };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to sync FIRST API data";
+        setError(message);
+        return { updated: 0, error: message };
+      } finally {
+        setSyncLoading(false);
+      }
+    },
+    [filters.year, teams]
+  );
+
   return {
     teams,
     filteredTeams,
@@ -336,5 +406,7 @@ export function useGlobalTeamStats() {
     resetFilters,
     lookupTeam,
     syncStatbotics,
+    syncFirstApi,
   };
 }
+
