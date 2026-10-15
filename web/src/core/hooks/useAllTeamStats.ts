@@ -138,6 +138,8 @@ export interface UseAllTeamStatsResult {
 export interface UseAllTeamStatsOptions {
     includeFuelOpr?: boolean;
     includeRollingRatings?: boolean;
+    /** Bump to re-read scout snapshots + TBA-derived caches after a background refresh. */
+    refreshNonce?: number;
 }
 
 /**
@@ -154,6 +156,7 @@ export const useAllTeamStats = (
     const {
         includeFuelOpr = true,
         includeRollingRatings = false,
+        refreshNonce = 0,
     } = options;
     const [scoutedTeamStats, setScoutedTeamStats] = useState<TeamStats[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -204,7 +207,7 @@ export const useAllTeamStats = (
         return () => {
             cancelled = true;
         };
-    }, [eventKey]);
+    }, [eventKey, refreshNonce]);
 
     useEffect(() => {
         let cancelled = false;
@@ -254,7 +257,7 @@ export const useAllTeamStats = (
         return () => {
             cancelled = true;
         };
-    }, [eventKey, scoutedTeamStats, includeFuelOpr]);
+    }, [eventKey, scoutedTeamStats, includeFuelOpr, refreshNonce]);
 
     useEffect(() => {
         let cancelled = false;
@@ -305,7 +308,7 @@ export const useAllTeamStats = (
         return () => {
             cancelled = true;
         };
-    }, [eventKey, scoutedTeamStats]);
+    }, [eventKey, scoutedTeamStats, refreshNonce]);
 
     useEffect(() => {
         let cancelled = false;
@@ -354,7 +357,7 @@ export const useAllTeamStats = (
         return () => {
             cancelled = true;
         };
-    }, [eventKey, scoutedTeamStats, includeRollingRatings]);
+    }, [eventKey, scoutedTeamStats, includeRollingRatings, refreshNonce]);
 
     const { enrichedScoutedTeamStats, enrichmentMs } = useMemo(() => {
         const startedAt = performance.now();
@@ -596,7 +599,7 @@ export const useAllTeamStats = (
         return () => {
             cancelled = true;
         };
-    }, [eventKey, enrichedScoutedTeamStats, includeFuelOpr]);
+    }, [eventKey, enrichedScoutedTeamStats, includeFuelOpr, includeRollingRatings, refreshNonce]);
 
     const { teamStats, combineMs } = useMemo(() => {
         const startedAt = performance.now();

@@ -167,6 +167,8 @@ export const GenericSelector = (props: GenericSelectorProps) => {
 
   const singleValue = props.value;
 
+  const isTeamSelector = label.toLowerCase().includes("team");
+
   if (isMobile) {
     return (
       <Sheet>
@@ -197,7 +199,11 @@ export const GenericSelector = (props: GenericSelectorProps) => {
                     )}
                     onClick={() => props.onValueChange("none")}
                   >
-                    {displayFormat("none") === "none" ? "No team" : displayFormat("none")}
+                    {displayFormat("none") === "none"
+                      ? isTeamSelector
+                        ? "No team"
+                        : "None"
+                      : displayFormat("none")}
                   </Button>
                 </SheetClose>
               )}
@@ -229,7 +235,7 @@ export const GenericSelector = (props: GenericSelectorProps) => {
                     )}
                     onClick={() => props.onValueChange(option)}
                   >
-                    {String(option).match(/^\d+$/) && !displayFormat(String(option)).includes("Team")
+                    {isTeamSelector && String(option).match(/^\d+$/) && !displayFormat(String(option)).includes("Team")
                       ? `Team ${displayFormat(String(option))}`
                       : displayFormat(option)}
                   </Button>

@@ -35,8 +35,8 @@ import QRDataTransferPage from "@/core/pages/QRDataTransferPage";
 // import PeerTransferPage from "@/pages/PeerTransferPage";
 // import MatchStrategyPage from "@/pages/MatchStrategyPage";
 // import { AutoScoringPage, TeleopScoringPage } from "@/pages/ScoringPage";
-// import EndgamePage from "@/pages/EndgamePage";
 import TeamStatsPage from "@/core/pages/TeamStatsPage";
+import GlobalStatisticsPage from "@/core/pages/GlobalStatisticsPage";
 import StrategyOverviewPage from "@/core/pages/StrategyOverviewPage";
 import MatchStrategyPage from "@/core/pages/MatchStrategyPage";
 import PickListPage from "@/core/pages/PickListPage";
@@ -139,6 +139,7 @@ function App() {
         {/* <Route path="/teleop-scoring" element={<TeleopScoringPage />} /> */}
         {/* <Route path="/endgame" element={<EndgamePage />} /> */}
         <Route path="/team-stats" element={<TeamStatsPage />} />
+        <Route path="/statistics" element={<GlobalStatisticsPage />} />
         <Route path="/strategy-overview" element={<StrategyOverviewPage />} />
         <Route path="/match-strategy" element={<MatchStrategyPage />} />
         <Route path="/pick-list" element={<PickListPage />} />

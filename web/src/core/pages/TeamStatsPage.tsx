@@ -6,8 +6,11 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
+import { BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card";
 import { Badge } from "@/core/components/ui/badge";
+import { Button } from "@/core/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/animate-ui/radix/tabs";
 import { GenericSelector } from "@/core/components/ui/generic-selector";
 import { DataAttribution } from "@/core/components/DataAttribution";
@@ -539,6 +542,12 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
                                                         ? 'CV only — scout for scores'
                                                         : 'Pit only'}
                                             </Badge>
+                                            <Button variant="outline" size="sm" className="h-6 text-xs gap-1 px-2 border-primary/30" asChild>
+                                                <Link to={`/statistics?team=${selectedTeam}`}>
+                                                    <BarChart3 className="h-3 w-3 text-primary" />
+                                                    <span>All-Time Stats</span>
+                                                </Link>
+                                            </Button>
                                         </div>
                                         {compareStats && (
                                             <div className="flex items-center gap-2">

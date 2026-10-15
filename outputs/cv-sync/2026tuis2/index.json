@@ -1,6 +1,6 @@
 {
   "event_key": "2026tuis2",
-  "updated_at": "2026-09-12T14:01:46.569554+00:00",
+  "updated_at": "2026-09-12T20:38:05.326742+00:00",
   "matches": [
     {
       "match_key": "2026tuis2_qm1",
@@ -235,6 +235,409 @@
       ],
       "processed_at": "2026-09-12T14:01:30.786370+00:00",
       "bundle_path": "2026tuis2_qm18/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm19",
+      "teams": [
+        "11164",
+        "5773",
+        "5883",
+        "6431",
+        "9001",
+        "9079"
+      ],
+      "processed_at": "2026-09-12T14:10:37.085889+00:00",
+      "bundle_path": "2026tuis2_qm19/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm20",
+      "teams": [
+        "11401",
+        "7729",
+        "8169",
+        "8725",
+        "9427",
+        "9468"
+      ],
+      "processed_at": "2026-09-12T14:19:04.729429+00:00",
+      "bundle_path": "2026tuis2_qm20/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm21",
+      "teams": [
+        "10213",
+        "10244",
+        "10261",
+        "10914",
+        "11266",
+        "5665"
+      ],
+      "processed_at": "2026-09-12T14:27:20.620572+00:00",
+      "bundle_path": "2026tuis2_qm21/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm22",
+      "teams": [
+        "11095",
+        "11166",
+        "11255",
+        "6838",
+        "7632",
+        "7672"
+      ],
+      "processed_at": "2026-09-12T14:36:08.698404+00:00",
+      "bundle_path": "2026tuis2_qm22/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm23",
+      "teams": [
+        "10920",
+        "5773",
+        "6417",
+        "7729",
+        "9001",
+        "9610"
+      ],
+      "processed_at": "2026-09-12T14:44:20.564604+00:00",
+      "bundle_path": "2026tuis2_qm23/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm24",
+      "teams": [
+        "10914",
+        "5665",
+        "5883",
+        "6988",
+        "9441",
+        "9468"
+      ],
+      "processed_at": "2026-09-12T14:52:42.924613+00:00",
+      "bundle_path": "2026tuis2_qm24/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm25",
+      "teams": [
+        "10261",
+        "11164",
+        "11401",
+        "7632",
+        "8169",
+        "9583"
+      ],
+      "processed_at": "2026-09-12T15:01:19.958268+00:00",
+      "bundle_path": "2026tuis2_qm25/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm26",
+      "teams": [
+        "10213",
+        "10244",
+        "11365",
+        "6431",
+        "6838",
+        "9427"
+      ],
+      "processed_at": "2026-09-12T15:33:57.568278+00:00",
+      "bundle_path": "2026tuis2_qm26/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm27",
+      "teams": [
+        "11166",
+        "11255",
+        "11266",
+        "7672",
+        "8725",
+        "9079"
+      ],
+      "processed_at": "2026-09-12T15:42:41.023839+00:00",
+      "bundle_path": "2026tuis2_qm27/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm29",
+      "teams": [
+        "11365",
+        "6431",
+        "7632",
+        "9427",
+        "9441",
+        "9610"
+      ],
+      "processed_at": "2026-09-12T15:52:19.464930+00:00",
+      "bundle_path": "2026tuis2_qm29/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm30",
+      "teams": [
+        "10213",
+        "11255",
+        "11401",
+        "5665",
+        "5883",
+        "6417"
+      ],
+      "processed_at": "2026-09-12T16:00:54.692205+00:00",
+      "bundle_path": "2026tuis2_qm30/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm31",
+      "teams": [
+        "10428",
+        "10920",
+        "11166",
+        "5773",
+        "6988",
+        "8725"
+      ],
+      "processed_at": "2026-09-12T16:10:17.119630+00:00",
+      "bundle_path": "2026tuis2_qm31/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm32",
+      "teams": [
+        "10244",
+        "11095",
+        "11266",
+        "8169",
+        "9079",
+        "9583"
+      ],
+      "processed_at": "2026-09-12T16:18:42.123275+00:00",
+      "bundle_path": "2026tuis2_qm32/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm33",
+      "teams": [
+        "10914",
+        "11164",
+        "6838",
+        "6948",
+        "7672",
+        "7729"
+      ],
+      "processed_at": "2026-09-12T16:27:12.274349+00:00",
+      "bundle_path": "2026tuis2_qm33/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm34",
+      "teams": [
+        "10261",
+        "11255",
+        "11365",
+        "5883",
+        "6417",
+        "9441"
+      ],
+      "processed_at": "2026-09-12T16:36:38.247188+00:00",
+      "bundle_path": "2026tuis2_qm34/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm35",
+      "teams": [
+        "11401",
+        "5665",
+        "7632",
+        "9001",
+        "9468",
+        "9583"
+      ],
+      "processed_at": "2026-09-12T16:46:17.529204+00:00",
+      "bundle_path": "2026tuis2_qm35/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm36",
+      "teams": [
+        "11166",
+        "11266",
+        "6431",
+        "6988",
+        "7729",
+        "9079"
+      ],
+      "processed_at": "2026-09-12T16:54:53.896739+00:00",
+      "bundle_path": "2026tuis2_qm36/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm37",
+      "teams": [
+        "10213",
+        "10244",
+        "10920",
+        "7672",
+        "8169",
+        "9610"
+      ],
+      "processed_at": "2026-09-12T17:04:09.773547+00:00",
+      "bundle_path": "2026tuis2_qm37/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm38",
+      "teams": [
+        "10428",
+        "10914",
+        "11095",
+        "11164",
+        "8725",
+        "9427"
+      ],
+      "processed_at": "2026-09-12T17:13:13.560180+00:00",
+      "bundle_path": "2026tuis2_qm38/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm39",
+      "teams": [
+        "11266",
+        "5665",
+        "5773",
+        "6838",
+        "6948",
+        "9583"
+      ],
+      "processed_at": "2026-09-12T17:22:06.085753+00:00",
+      "bundle_path": "2026tuis2_qm39/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm40",
+      "teams": [
+        "10213",
+        "11365",
+        "6988",
+        "7729",
+        "9079",
+        "9468"
+      ],
+      "processed_at": "2026-09-12T17:30:34.934077+00:00",
+      "bundle_path": "2026tuis2_qm40/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm42",
+      "teams": [
+        "10428",
+        "11164",
+        "11255",
+        "5773",
+        "8725",
+        "9610"
+      ],
+      "processed_at": "2026-09-12T18:09:16.792949+00:00",
+      "bundle_path": "2026tuis2_qm42/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm43",
+      "teams": [
+        "10914",
+        "10920",
+        "6838",
+        "8169",
+        "9001",
+        "9441"
+      ],
+      "processed_at": "2026-09-12T18:17:57.344384+00:00",
+      "bundle_path": "2026tuis2_qm43/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm44",
+      "teams": [
+        "10244",
+        "5883",
+        "6417",
+        "6431",
+        "6948",
+        "7632"
+      ],
+      "processed_at": "2026-09-12T18:26:59.303436+00:00",
+      "bundle_path": "2026tuis2_qm44/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm45",
+      "teams": [
+        "10428",
+        "11255",
+        "7672",
+        "7729",
+        "9583",
+        "9610"
+      ],
+      "processed_at": "2026-09-12T18:35:10.550491+00:00",
+      "bundle_path": "2026tuis2_qm45/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm46",
+      "teams": [
+        "10914",
+        "10920",
+        "5665",
+        "5773",
+        "9079",
+        "9427"
+      ],
+      "processed_at": "2026-09-12T18:58:07.303594+00:00",
+      "bundle_path": "2026tuis2_qm46/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm47",
+      "teams": [
+        "10213",
+        "11164",
+        "11166",
+        "11401",
+        "6431",
+        "8169"
+      ],
+      "processed_at": "2026-09-12T19:07:44.894351+00:00",
+      "bundle_path": "2026tuis2_qm47/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm48",
+      "teams": [
+        "11095",
+        "6417",
+        "6838",
+        "6988",
+        "7632",
+        "8725"
+      ],
+      "processed_at": "2026-09-12T19:28:05.598335+00:00",
+      "bundle_path": "2026tuis2_qm48/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm49",
+      "teams": [
+        "10261",
+        "11266",
+        "5883",
+        "6948",
+        "9001",
+        "9441"
+      ],
+      "processed_at": "2026-09-12T19:51:32.366978+00:00",
+      "bundle_path": "2026tuis2_qm49/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm50",
+      "teams": [
+        "10244",
+        "10914",
+        "11166",
+        "11365",
+        "5773",
+        "9468"
+      ],
+      "processed_at": "2026-09-12T20:13:59.458300+00:00",
+      "bundle_path": "2026tuis2_qm50/ai_scout_bundle.json"
+    },
+    {
+      "match_key": "2026tuis2_qm51",
+      "teams": [
+        "10213",
+        "10428",
+        "11255",
+        "11401",
+        "6417",
+        "9079"
+      ],
+      "processed_at": "2026-09-12T20:37:04.349269+00:00",
+      "bundle_path": "2026tuis2_qm51/ai_scout_bundle.json"
     }
   ]
 }

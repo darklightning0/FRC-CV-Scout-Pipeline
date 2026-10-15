@@ -341,7 +341,7 @@ export const strategyColumns = {
     teamInfo: {
         teamNumber: { label: "Team", visible: true, numeric: false },
         eventKey: { label: "Event", visible: true, numeric: false },
-        matchCount: { label: "Matches", visible: true, numeric: true },
+        matchCount: { label: "Matches (TBA)", visible: true, numeric: true },
     },
     // Point totals (use rawValues for user-selectable aggregation)
     points: {

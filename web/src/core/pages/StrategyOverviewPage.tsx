@@ -129,7 +129,7 @@ export default function StrategyOverviewPage() {
     }, [requiredMetricKeys]);
 
     // Calculate statistics using centralized hook
-    const { teamStats, filteredTeamStats, isLoading, error, availableEvents } = useTeamStatistics(
+    const { teamStats, filteredTeamStats, isLoading, error, availableEvents, tbaStatus, refreshTba } = useTeamStatistics(
         selectedEventFilter,
         { ...strategyConfig, columns: columnConfig },
         columnFilters,
@@ -238,6 +238,8 @@ export default function StrategyOverviewPage() {
                 onSettingsOpenChange={() => { }}
                 chartType={chartType}
                 onChartTypeChange={setChartType}
+                tbaStatus={tbaStatus}
+                onRefreshTba={refreshTba}
             />
 
             {isHeavyContentPending ? (

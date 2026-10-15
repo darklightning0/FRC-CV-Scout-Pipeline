@@ -1,7 +1,9 @@
 import { Button } from "@/core/components/ui/button";
 import { GenericSelector } from "@/core/components/ui/generic-selector";
-import { X } from "lucide-react";
+import { Badge } from "@/core/components/ui/badge";
+import { RefreshCw, X } from "lucide-react";
 import { AggregationType } from "@/core/types/strategy";
+import { cn } from "@/core/lib/utils";
 
 interface StrategyHeaderProps {
     filteredTeamCount: number;
@@ -17,6 +19,22 @@ interface StrategyHeaderProps {
     onSettingsOpenChange: (open: boolean) => void;
     chartType: "bar" | "scatter" | "box" | "stacked";
     onChartTypeChange: (type: "bar" | "scatter" | "box" | "stacked") => void;
+    tbaStatus?: {
+        isOnline: boolean;
+        isRefreshing: boolean;
+        lastUpdatedAt: number | null;
+        dataSource: 'cache' | 'tba' | 'none';
+    };
+    onRefreshTba?: () => void;
+}
+
+function formatCacheAge(timestamp: number): string {
+    const ageMinutes = Math.floor((Date.now() - timestamp) / (1000 * 60));
+    if (ageMinutes < 1) return 'just now';
+    if (ageMinutes < 60) return `${ageMinutes} min ago`;
+    const hours = Math.floor(ageMinutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
 }
 
 export const StrategyHeader = ({
@@ -30,6 +48,8 @@ export const StrategyHeader = ({
     onAggregationTypeChange,
     onClearAllFilters,
     chartType,
+    tbaStatus,
+    onRefreshTba,
 }: StrategyHeaderProps) => {
     const handleAggregationTypeChange = (value: string) => {
         onAggregationTypeChange(value as AggregationType);
@@ -39,7 +59,7 @@ export const StrategyHeader = ({
         <div className="flex flex-col md:flex-row justify-between">
             <div>
                 <h1 className="text-2xl font-bold pb-2">Strategy Overview</h1>
-                <p className="text-muted-foreground pb-8 md:pb-0">
+                <p className="text-muted-foreground pb-2 md:pb-0">
                     Team performance analysis with {filteredTeamCount} teams
                     {activeFilterCount > 0 && (
                         <span className="ml-2">
@@ -56,10 +76,41 @@ export const StrategyHeader = ({
                         </span>
                     )}
                 </p>
+                {tbaStatus && (
+                    <div className="flex flex-wrap items-center gap-2 pb-4 text-xs text-muted-foreground">
+                        {!tbaStatus.isOnline && (
+                            <Badge variant="outline" className="font-normal">Offline</Badge>
+                        )}
+                        {tbaStatus.dataSource === 'cache' && (
+                            <Badge variant="secondary" className="font-normal">TBA cache</Badge>
+                        )}
+                        {tbaStatus.dataSource === 'tba' && tbaStatus.isOnline && (
+                            <Badge variant="secondary" className="font-normal">TBA updated</Badge>
+                        )}
+                        {tbaStatus.lastUpdatedAt != null && (
+                            <span>Updated {formatCacheAge(tbaStatus.lastUpdatedAt)}</span>
+                        )}
+                        <span className="text-muted-foreground/80">
+                            Matches &amp; points use TBA when scout data is missing
+                        </span>
+                    </div>
+                )}
             </div>
 
-            <div className="flex gap-2 pb-4 items-center">
-                {/* Event Filter */}
+            <div className="flex gap-2 pb-4 items-center flex-wrap">
+                {onRefreshTba && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onRefreshTba}
+                        disabled={!tbaStatus?.isOnline || tbaStatus.isRefreshing}
+                    >
+                        <RefreshCw className={cn('h-4 w-4 mr-1.5', tbaStatus?.isRefreshing && 'animate-spin')} />
+                        {tbaStatus?.isRefreshing ? 'Refreshing…' : 'Refresh TBA'}
+                    </Button>
+                )}
+
                 <GenericSelector
                     label="Select Event"
                     multiSelect={true}
@@ -71,7 +122,6 @@ export const StrategyHeader = ({
                     className="w-48"
                 />
 
-                {/* Aggregation Type */}
                 <div className="relative">
                     <GenericSelector
                         label="Select Aggregation Type"

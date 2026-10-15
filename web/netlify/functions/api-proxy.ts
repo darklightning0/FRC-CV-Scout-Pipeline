@@ -16,8 +16,14 @@ const tbaAllowed = [
   /^\/events\/\d+(?:\/simple)?$/,
   /^\/event\/[a-z0-9]+\/matches(?:\/simple)?$/i,
   /^\/event\/[a-z0-9]+\/coprs$/i,
-  /^\/event\/[a-z0-9]+\/teams\/keys$/i,
+  /^\/event\/[a-z0-9]+\/teams(?:\/keys|\/simple)?$/i,
   /^\/match\/[a-z0-9_]+$/i,
+  /^\/team\/frc\d+(?:\/simple)?$/i,
+  /^\/team\/frc\d+\/years$/i,
+  /^\/team\/frc\d+\/awards$/i,
+  /^\/team\/frc\d+\/events(?:\/\d+)?(?:\/simple)?$/i,
+  /^\/teams\/\d+(?:\/simple)?$/i,
+  /^\/teams\/\d+\/\d+(?:\/simple)?$/i,
 ];
 
 const nexusAllowed = [
@@ -29,15 +35,26 @@ const nexusAllowed = [
 
 const statboticsAllowed = [
   /^\/team_event\/\d+\/[a-z0-9]+$/i,
+  /^\/team_events$/i,
+  /^\/team\/\d+$/i,
+  /^\/team_year\/\d+\/\d+$/i,
+  /^\/teams$/i,
+  /^\/team_years$/i,
 ];
 
+function endpointPath(endpoint: string): string {
+  const queryIndex = endpoint.indexOf('?');
+  return queryIndex === -1 ? endpoint : endpoint.slice(0, queryIndex);
+}
+
 function isAllowedEndpoint(provider: Provider, endpoint: string): boolean {
+  const path = endpointPath(endpoint);
   const rules = provider === 'tba'
     ? tbaAllowed
     : provider === 'nexus'
       ? nexusAllowed
       : statboticsAllowed;
-  return rules.some(rule => rule.test(endpoint));
+  return rules.some(rule => rule.test(path));
 }
 
 function getServerApiKey(provider: Provider): string | undefined {

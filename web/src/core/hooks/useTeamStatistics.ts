@@ -1,16 +1,18 @@
 /**
  * Team Statistics Hook for Strategy Overview Page
- * 
- * This hook wraps useAllTeamStats and applies Strategy Overview-specific
- * filtering and column visibility logic.
- * 
- * NOTE: This hook NO LONGER calculates stats directly. All calculations
- * are done in game-template/calculations.ts via useAllTeamStats.
+ *
+ * Wraps useAllTeamStats with Strategy Overview filtering/aggregation.
+ * Offline-first TBA: paints from cache, refreshes matches/COPR/EPA when online,
+ * and falls back Matches / point columns to TBA when scout data is empty.
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type UseAllTeamStatsDebugInfo, useAllTeamStats, type UseAllTeamStatsOptions } from "./useAllTeamStats";
 import { StrategyConfig, ColumnFilter, TeamData, AggregationType } from "@/core/types/strategy";
+import type { TeamStats } from "@/core/types/team-stats";
+import { getCachedTBAEventKeys } from "@/core/lib/tbaCache";
+import { getCurrentEvent } from "@/core/lib/tba/eventDataUtils";
+import { refreshTbaStrategyDataForEvents } from "@/core/lib/tba/refreshTbaStrategyData";
 
 export interface UseTeamStatisticsResult {
     teamStats: TeamData[];
@@ -22,6 +24,13 @@ export interface UseTeamStatisticsResult {
     mappingMs?: number;
     aggregationMs?: number;
     filterMs?: number;
+    tbaStatus: {
+        isOnline: boolean;
+        isRefreshing: boolean;
+        lastUpdatedAt: number | null;
+        dataSource: 'cache' | 'tba' | 'none';
+    };
+    refreshTba: () => void;
 }
 
 function normalizeEventFilter(eventFilter: string | string[] | undefined): string[] {
@@ -40,6 +49,86 @@ function normalizeEventFilter(eventFilter: string | string[] | undefined): strin
     return [eventFilter];
 }
 
+function hasScoutPointSamples(stats: TeamStats, rawKey: string): boolean {
+    if ((stats.matchCount ?? 0) <= 0) {
+        return false;
+    }
+    const values = stats.rawValues?.[rawKey];
+    return Array.isArray(values) && values.length > 0;
+}
+
+function resolveMatchCount(stats: TeamStats): number {
+    const tba = stats.tbaMatchesPlayed ?? 0;
+    if (tba > 0) {
+        return tba;
+    }
+    return stats.matchCount ?? 0;
+}
+
+function resolveColumnValue(
+    stats: TeamStats,
+    path: string,
+    aggregationType: AggregationType
+): number | string | undefined {
+    const scoutValue = getValueByPath(stats, path, aggregationType);
+
+    if (path === 'rawValues.totalPoints') {
+        if (hasScoutPointSamples(stats, 'totalPoints')) {
+            return (typeof scoutValue === 'number' || typeof scoutValue === 'string' ? scoutValue : undefined);
+        }
+        if (typeof stats.coprTotalPoints === 'number' && Number.isFinite(stats.coprTotalPoints)) {
+            return stats.coprTotalPoints;
+        }
+        if (typeof stats.statboticsTotalPoints === 'number' && Number.isFinite(stats.statboticsTotalPoints)) {
+            return stats.statboticsTotalPoints;
+        }
+        return (typeof scoutValue === 'number' || typeof scoutValue === 'string' ? scoutValue : undefined);
+    }
+
+    if (path === 'rawValues.autoPoints') {
+        if (hasScoutPointSamples(stats, 'autoPoints')) {
+            return (typeof scoutValue === 'number' || typeof scoutValue === 'string' ? scoutValue : undefined);
+        }
+        if (typeof stats.coprTotalAutoPoints === 'number' && Number.isFinite(stats.coprTotalAutoPoints)) {
+            return stats.coprTotalAutoPoints;
+        }
+        if (typeof stats.statboticsAutoPoints === 'number' && Number.isFinite(stats.statboticsAutoPoints)) {
+            return stats.statboticsAutoPoints;
+        }
+        return (typeof scoutValue === 'number' || typeof scoutValue === 'string' ? scoutValue : undefined);
+    }
+
+    if (path === 'rawValues.teleopPoints') {
+        if (hasScoutPointSamples(stats, 'teleopPoints')) {
+            return (typeof scoutValue === 'number' || typeof scoutValue === 'string' ? scoutValue : undefined);
+        }
+        if (typeof stats.coprTotalTeleopPoints === 'number' && Number.isFinite(stats.coprTotalTeleopPoints)) {
+            return stats.coprTotalTeleopPoints;
+        }
+        if (typeof stats.statboticsTeleopPoints === 'number' && Number.isFinite(stats.statboticsTeleopPoints)) {
+            return stats.statboticsTeleopPoints;
+        }
+        return (typeof scoutValue === 'number' || typeof scoutValue === 'string' ? scoutValue : undefined);
+    }
+
+    if (path === 'rawValues.endgamePoints') {
+        if (hasScoutPointSamples(stats, 'endgamePoints')) {
+            return (typeof scoutValue === 'number' || typeof scoutValue === 'string' ? scoutValue : undefined);
+        }
+        if (typeof stats.coprEndgameTowerPoints === 'number' && Number.isFinite(stats.coprEndgameTowerPoints)) {
+            return stats.coprEndgameTowerPoints;
+        }
+        if (typeof stats.statboticsEndgamePoints === 'number' && Number.isFinite(stats.statboticsEndgamePoints)) {
+            return stats.statboticsEndgamePoints;
+        }
+        return (typeof scoutValue === 'number' || typeof scoutValue === 'string' ? scoutValue : undefined);
+    }
+
+    return typeof scoutValue === 'number' || typeof scoutValue === 'string'
+        ? scoutValue
+        : undefined;
+}
+
 export const useTeamStatistics = (
     eventFilter: string | string[] | undefined,
     config: StrategyConfig,
@@ -48,13 +137,101 @@ export const useTeamStatistics = (
     allTeamStatsOptions: UseAllTeamStatsOptions = {}
 ): UseTeamStatisticsResult => {
     const selectedEventKeys = useMemo(() => normalizeEventFilter(eventFilter), [eventFilter]);
+    const [refreshNonce, setRefreshNonce] = useState(0);
+    const [forceRefreshTick, setForceRefreshTick] = useState(0);
+    const forceRefreshRef = useRef(false);
+    const [isOnline, setIsOnline] = useState(
+        typeof navigator !== 'undefined' ? navigator.onLine : true
+    );
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+    const [dataSource, setDataSource] = useState<'cache' | 'tba' | 'none'>('none');
 
-    // Load once and apply event filtering in this hook to avoid duplicate IndexedDB reads.
-    const { teamStats: allTeamStats, isLoading, error, debugInfo } = useAllTeamStats(undefined, allTeamStatsOptions);
+    const { teamStats: allTeamStats, isLoading, error, debugInfo } = useAllTeamStats(undefined, {
+        ...allTeamStatsOptions,
+        refreshNonce,
+    });
 
     const availableEvents = useMemo(() => {
         return Array.from(new Set(allTeamStats.map((team) => team.eventKey).filter(Boolean))).sort();
     }, [allTeamStats]);
+
+    const refreshEventKeySignature = useMemo(() => {
+        const keys = selectedEventKeys.length > 0 ? selectedEventKeys : availableEvents;
+        return [...new Set(keys.map((k) => k.trim().toLowerCase()).filter(Boolean))].sort().join(',');
+    }, [selectedEventKeys, availableEvents]);
+
+    useEffect(() => {
+        const onOnline = () => setIsOnline(true);
+        const onOffline = () => setIsOnline(false);
+        window.addEventListener('online', onOnline);
+        window.addEventListener('offline', onOffline);
+        return () => {
+            window.removeEventListener('online', onOnline);
+            window.removeEventListener('offline', onOffline);
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const run = async () => {
+            let keys = refreshEventKeySignature
+                ? refreshEventKeySignature.split(',').filter(Boolean)
+                : [];
+
+            if (keys.length === 0) {
+                const cachedKeys = await getCachedTBAEventKeys();
+                const current = getCurrentEvent()?.trim();
+                keys = [
+                    ...cachedKeys,
+                    ...(current ? [current.toLowerCase()] : []),
+                ];
+            }
+
+            keys = [...new Set(keys.map((k) => k.trim().toLowerCase()).filter(Boolean))];
+            if (keys.length === 0) {
+                if (!cancelled) {
+                    setDataSource('none');
+                    setIsRefreshing(false);
+                }
+                return;
+            }
+
+            if (!cancelled) {
+                setDataSource('cache');
+            }
+
+            if (!isOnline) {
+                return;
+            }
+
+            if (!cancelled) setIsRefreshing(true);
+            try {
+                const force = forceRefreshRef.current;
+                forceRefreshRef.current = false;
+                const { anyUpdated } = await refreshTbaStrategyDataForEvents(keys, {
+                    force,
+                });
+                if (cancelled) return;
+                if (anyUpdated) {
+                    setDataSource('tba');
+                    setLastUpdatedAt(Date.now());
+                    setRefreshNonce((n) => n + 1);
+                } else {
+                    setDataSource('cache');
+                    setLastUpdatedAt(Date.now());
+                }
+            } finally {
+                if (!cancelled) setIsRefreshing(false);
+            }
+        };
+
+        void run();
+        return () => {
+            cancelled = true;
+        };
+    }, [refreshEventKeySignature, isOnline, forceRefreshTick]);
 
     const filteredSourceTeamStats = useMemo(() => {
         if (selectedEventKeys.length === 0) {
@@ -65,28 +242,28 @@ export const useTeamStatistics = (
         return allTeamStats.filter((team) => selectedSet.has(team.eventKey));
     }, [allTeamStats, selectedEventKeys]);
 
-    // Convert TeamStats to TeamData format (for backwards compatibility)
     const { mappedTeamStats, mappingMs } = useMemo(() => {
         const startedAt = performance.now();
         const mapped = filteredSourceTeamStats.map(stats => {
             const teamData: TeamData = {
                 teamNumber: stats.teamNumber,
                 eventKey: stats.eventKey,
-                matchCount: stats.matchCount,
+                matchCount: resolveMatchCount(stats),
                 rawValues: stats.rawValues,
             };
 
-            // Map all stats to the TeamData object
-            // This allows the existing table/chart code to work without changes
             config.columns.forEach(col => {
                 if (["teamNumber", "eventKey", "matchCount"].includes(col.key)) return;
 
-                // Get value from stats using dot notation
-                const value = getValueByPath(stats, col.key, aggregationType);
-                if (value !== undefined) {
+                const value = resolveColumnValue(stats, col.key, aggregationType);
+                if (typeof value === 'number' || typeof value === 'string') {
                     teamData[col.key] = value;
                 }
             });
+
+            if (typeof stats.tbaMatchesPlayed === 'number') {
+                teamData.tbaMatchesPlayed = stats.tbaMatchesPlayed;
+            }
 
             return teamData;
         });
@@ -134,6 +311,14 @@ export const useTeamStatistics = (
 
             for (const key of allKeys) {
                 if (key === 'teamNumber' || key === 'eventKey' || key === 'matchCount') {
+                    continue;
+                }
+
+                if (key === 'tbaMatchesPlayed') {
+                    merged.tbaMatchesPlayed = rows.reduce((sum, row) => {
+                        const count = typeof row.tbaMatchesPlayed === 'number' ? row.tbaMatchesPlayed : 0;
+                        return sum + count;
+                    }, 0);
                     continue;
                 }
 
@@ -240,8 +425,29 @@ export const useTeamStatistics = (
         };
     }, [teamStats, columnFilters]);
 
-    return { teamStats, filteredTeamStats, availableEvents, isLoading, error, debugInfo, mappingMs, aggregationMs, filterMs };
+    return {
+        teamStats,
+        filteredTeamStats,
+        availableEvents,
+        isLoading,
+        error,
+        debugInfo,
+        mappingMs,
+        aggregationMs,
+        filterMs,
+        tbaStatus: {
+            isOnline,
+            isRefreshing,
+            lastUpdatedAt,
+            dataSource,
+        },
+        refreshTba: () => {
+            forceRefreshRef.current = true;
+            setForceRefreshTick((n) => n + 1);
+        },
+    };
 };
+
 
 /**
  * Helper to get nested value from object using dot notation

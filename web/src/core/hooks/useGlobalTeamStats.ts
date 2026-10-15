@@ -1,0 +1,340 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { fetchGlobalTeamFromApis, loadGlobalStatsBundle, syncSeasonFromStatbotics } from "@/core/lib/global-stats/api";
+import { loadCachedGlobalTeams, putCachedGlobalTeam, putCachedGlobalTeams } from "@/core/lib/global-stats/cache";
+import { canonicalCity, isTurkeyCountry, matchesGlobalStatsFilters, yearForDisplay } from "@/core/lib/global-stats/normalize";
+import type { GlobalStatsFilters, GlobalStatsSortField, GlobalTeamProfile } from "@/core/lib/global-stats/types";
+
+const FILTERS_STORAGE_KEY = "global_stats_filters";
+
+const DEFAULT_FILTERS: GlobalStatsFilters = {
+  search: "",
+  country: "all",
+  city: "all",
+  year: "all",
+  activeOnly: false,
+  offlineOnly: false,
+  hasAwardsOnly: false,
+  sortField: "epa",
+  sortDirection: "desc",
+};
+
+const TURKEY_PRIORITY_CITIES = [
+  "Izmir",
+  "Istanbul",
+  "Ankara",
+  "Kocaeli",
+  "Bursa",
+  "Antalya",
+  "Eskişehir",
+  "Adana",
+  "Gaziantep",
+  "Konya",
+];
+
+function readStoredFilters(): GlobalStatsFilters {
+  try {
+    const raw = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!raw) return DEFAULT_FILTERS;
+    return { ...DEFAULT_FILTERS, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_FILTERS;
+  }
+}
+
+function mergeTeams(existing: GlobalTeamProfile[], incoming: GlobalTeamProfile[]): GlobalTeamProfile[] {
+  const byNumber = new Map(existing.map((team) => [team.teamNumber, team]));
+  for (const team of incoming) {
+    const previous = byNumber.get(team.teamNumber);
+    if (!previous || (team.updatedAt ?? 0) >= (previous.updatedAt ?? 0)) {
+      byNumber.set(team.teamNumber, {
+        ...previous,
+        ...team,
+        awards: team.awards?.length ? team.awards : previous?.awards,
+        years: team.years.length ? team.years : previous?.years ?? [],
+      });
+    }
+  }
+  return [...byNumber.values()].sort((a, b) => a.teamNumber - b.teamNumber);
+}
+
+export function useGlobalTeamStats() {
+  const [teams, setTeams] = useState<GlobalTeamProfile[]>([]);
+  const [filters, setFilters] = useState<GlobalStatsFilters>(DEFAULT_FILTERS);
+  const [loading, setLoading] = useState(true);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [bundleGeneratedAt, setBundleGeneratedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    setFilters(readStoredFilters());
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters));
+  }, [filters]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [cached, bundle] = await Promise.all([loadCachedGlobalTeams(), loadGlobalStatsBundle()]);
+        if (cancelled) return;
+        const bundleTeams = (bundle?.teams ?? []).map((team: GlobalTeamProfile) => ({ ...team, source: "offline" as const }));
+        if (bundleTeams.length > 0) {
+          await putCachedGlobalTeams(bundleTeams);
+        }
+        setBundleGeneratedAt(bundle?.generatedAt ?? null);
+        setTeams(mergeTeams(cached, bundleTeams));
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : "Failed to load team statistics");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filteredTeams = useMemo(() => {
+    const matched = teams.filter((team) => matchesGlobalStatsFilters(team, filters));
+    const sortField = filters.sortField ?? "epa";
+    const sortDirection = filters.sortDirection ?? "desc";
+    const dir = sortDirection === "asc" ? 1 : -1;
+
+    return matched.sort((a, b) => {
+      const yearA = yearForDisplay(a, filters.year);
+      const yearB = yearForDisplay(b, filters.year);
+
+      let valA: number | string | null = null;
+      let valB: number | string | null = null;
+
+      switch (sortField) {
+        case "epa":
+          valA = yearA?.epaTotal ?? a.normEpa?.current ?? -9999;
+          valB = yearB?.epaTotal ?? b.normEpa?.current ?? -9999;
+          break;
+        case "auto":
+          valA = yearA?.epaAuto ?? -9999;
+          valB = yearB?.epaAuto ?? -9999;
+          break;
+        case "teleop":
+          valA = yearA?.epaTeleop ?? -9999;
+          valB = yearB?.epaTeleop ?? -9999;
+          break;
+        case "endgame":
+          valA = yearA?.epaEndgame ?? -9999;
+          valB = yearB?.epaEndgame ?? -9999;
+          break;
+        case "winrate": {
+          const recA = filters.year === "all" ? a.careerRecord : yearA?.record;
+          const recB = filters.year === "all" ? b.careerRecord : yearB?.record;
+          valA = recA?.winrate ?? -1;
+          valB = recB?.winrate ?? -1;
+          break;
+        }
+        case "worldRank":
+          valA = yearA?.ranks?.worldRank ?? 999999;
+          valB = yearB?.ranks?.worldRank ?? 999999;
+          // default rank sort is ascending (rank 1 is best)
+          return (Number(valA) - Number(valB)) * (sortDirection === "asc" ? -1 : 1) * dir;
+        case "countryRank":
+          valA = yearA?.ranks?.countryRank ?? 999999;
+          valB = yearB?.ranks?.countryRank ?? 999999;
+          return (Number(valA) - Number(valB)) * (sortDirection === "asc" ? -1 : 1) * dir;
+        case "teamNumber":
+          return (a.teamNumber - b.teamNumber) * dir;
+        case "name":
+          return a.name.localeCompare(b.name) * dir;
+        case "awards":
+          valA = a.awards?.length ?? 0;
+          valB = b.awards?.length ?? 0;
+          break;
+        default:
+          valA = a.teamNumber;
+          valB = b.teamNumber;
+      }
+
+      if (typeof valA === "number" && typeof valB === "number") {
+        return (valA - valB) * dir;
+      }
+      return String(valA ?? "").localeCompare(String(valB ?? "")) * dir;
+    });
+  }, [teams, filters]);
+
+  const countryOptions = useMemo(() => {
+    const detected = new Set<string>();
+    for (const team of teams) {
+      if (team.country) {
+        if (isTurkeyCountry(team.country)) {
+          detected.add("Turkey");
+        } else {
+          detected.add(team.country.trim());
+        }
+      }
+    }
+    const priority = ["Turkey", "USA", "Canada", "Israel", "Mexico", "Australia"];
+    const topFound = priority.filter((c) => detected.has(c));
+    const others = [...detected]
+      .filter((c) => !priority.includes(c))
+      .sort((a, b) => a.localeCompare(b));
+    return ["all", ...topFound, ...others];
+  }, [teams]);
+
+  const cityOptions = useMemo(() => {
+    const detected = new Set<string>();
+    for (const team of teams) {
+      if (filters.country === "Turkey" && !isTurkeyCountry(team.country)) {
+        continue;
+      }
+      const canon = canonicalCity(team.city, team.state);
+      if (canon) detected.add(canon);
+    }
+
+    if (filters.country === "Turkey") {
+      const topFound = TURKEY_PRIORITY_CITIES.filter((c) => detected.has(c));
+      const remaining = [...detected]
+        .filter((c) => !TURKEY_PRIORITY_CITIES.includes(c))
+        .sort((a, b) => a.localeCompare(b));
+      return [...topFound, ...remaining];
+    }
+
+    return [...detected].sort((a, b) => a.localeCompare(b));
+  }, [teams, filters.country]);
+
+  const yearOptions = useMemo(() => {
+    const years = new Set<number>();
+    for (const team of teams) {
+      for (const year of team.years) years.add(year.year);
+    }
+    return [...years].sort((a, b) => b - a);
+  }, [teams]);
+
+  const toggleSort = useCallback((field: GlobalStatsSortField) => {
+    setFilters((prev) => {
+      if (prev.sortField === field) {
+        return {
+          ...prev,
+          sortDirection: prev.sortDirection === "asc" ? "desc" : "asc",
+        };
+      }
+      return {
+        ...prev,
+        sortField: field,
+        sortDirection: field === "worldRank" || field === "countryRank" ? "asc" : "desc",
+      };
+    });
+  }, []);
+
+  const resetFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
+  }, []);
+
+  const lookupTeam = useCallback(async (teamNumber: number) => {
+    setLookupLoading(true);
+    setError(null);
+    try {
+      const profile = await fetchGlobalTeamFromApis(teamNumber);
+      await putCachedGlobalTeam(profile);
+      setTeams((current) => mergeTeams(current, [profile]));
+      return profile;
+    } catch (lookupError) {
+      const message = lookupError instanceof Error ? lookupError.message : "Could not look up that team";
+      setError(message);
+      return null;
+    } finally {
+      setLookupLoading(false);
+    }
+  }, []);
+
+  const syncStatbotics = useCallback(
+    async (targetYear?: number) => {
+      setSyncLoading(true);
+      setError(null);
+      try {
+        const yearToSync =
+          targetYear ??
+          (filters.year !== "all" && Number.isFinite(Number(filters.year))
+            ? Number(filters.year)
+            : 2026);
+
+        const result = await syncSeasonFromStatbotics(yearToSync);
+        if (result.count === 0) {
+          return { updated: 0, year: yearToSync };
+        }
+
+        const existingMap = new Map(teams.map((t) => [t.teamNumber, t]));
+        const updatedList: GlobalTeamProfile[] = [];
+
+        result.records.forEach((seasonYear, teamNum) => {
+          const existing = existingMap.get(teamNum);
+          if (existing) {
+            const filteredYears = existing.years.filter((y) => y.year !== yearToSync);
+            const updatedYears = [...filteredYears, seasonYear].sort((a, b) => a.year - b.year);
+            const updatedTeam: GlobalTeamProfile = {
+              ...existing,
+              years: updatedYears,
+              updatedAt: Date.now(),
+            };
+            if (seasonYear.epaNorm != null) {
+              updatedTeam.normEpa = {
+                ...existing.normEpa,
+                current: seasonYear.epaNorm,
+              };
+            }
+            updatedList.push(updatedTeam);
+          } else {
+            const newTeam: GlobalTeamProfile = {
+              teamNumber: teamNum,
+              name: seasonYear.name || `Team ${teamNum}`,
+              years: [seasonYear],
+              active: true,
+              source: "online",
+              updatedAt: Date.now(),
+            };
+            updatedList.push(newTeam);
+          }
+        });
+
+        await putCachedGlobalTeams(updatedList);
+        setTeams((prev) => mergeTeams(prev, updatedList));
+
+        return { updated: updatedList.length, year: yearToSync };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to sync Statbotics data";
+        setError(message);
+        return { updated: 0, error: message };
+      } finally {
+        setSyncLoading(false);
+      }
+    },
+    [filters.year, teams]
+  );
+
+  return {
+    teams,
+    filteredTeams,
+    filters,
+    setFilters,
+    loading,
+    lookupLoading,
+    syncLoading,
+    error,
+    bundleGeneratedAt,
+    countryOptions,
+    cityOptions,
+    yearOptions,
+    toggleSort,
+    resetFilters,
+    lookupTeam,
+    syncStatbotics,
+  };
+}

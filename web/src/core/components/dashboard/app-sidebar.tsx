@@ -90,6 +90,10 @@ const data = {
           url: "/team-stats",
         },
         {
+          title: "Statistics",
+          url: "/statistics",
+        },
+        {
           title: "Pit Scouting",
           url: "/pit-scouting",
         },
