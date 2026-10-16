@@ -108,7 +108,16 @@ export const handler: Handler = async (event) => {
       }
       const key = `heatmap:${eventKey}:${matchKey}:${team}`;
       const png = await store.get(key, { type: 'arrayBuffer' });
-      if (!png) return json(404, { error: 'Heatmap not found' });
+      if (!png) {
+        return {
+          statusCode: 204,
+          headers: {
+            ...corsHeaders,
+            'Cache-Control': 'public, max-age=60',
+          },
+          body: '',
+        };
+      }
       return {
         statusCode: 200,
         headers: {

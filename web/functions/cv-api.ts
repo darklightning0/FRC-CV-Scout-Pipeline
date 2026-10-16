@@ -139,7 +139,14 @@ export async function onRequest(context: {
       }
       const key = `heatmap:${eventKey}:${matchKey}:${team}`;
       const png = await store.get(key, 'arrayBuffer');
-      if (!png) return json(404, { error: 'Heatmap not found' });
+      if (!png) {
+        return new Response(null, {
+          status: 204,
+          headers: corsHeaders({
+            'Cache-Control': 'public, max-age=60',
+          }),
+        });
+      }
       return new Response(png as ArrayBuffer, {
         status: 200,
         headers: corsHeaders({
