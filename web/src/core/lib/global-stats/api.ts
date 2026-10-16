@@ -2,7 +2,6 @@ import { proxyGetJson } from "@/core/lib/apiProxy";
 import type {
   GlobalEpaRanks,
   GlobalNormEpa,
-  GlobalStatsBundle,
   GlobalTeamAward,
   GlobalTeamProfile,
   GlobalTeamRecord,
@@ -136,31 +135,169 @@ const compactNormEpa = (raw?: StatboticsTeamResponse["norm_epa"]): GlobalNormEpa
   };
 };
 
-const GLOBAL_BUNDLE_URL = "/data/global-frc-stats.json";
 const TURKEY_BUNDLE_URL = "/data/turkey-frc-stats.json";
 
-export async function loadGlobalStatsBundle(): Promise<GlobalStatsBundle | null> {
-  try {
-    const globalRes = await fetch(GLOBAL_BUNDLE_URL, { cache: "force-cache" });
-    if (globalRes.ok) {
-      return (await globalRes.json()) as GlobalStatsBundle;
-    }
-  } catch {
-    // Fallback below
-  }
-
+export async function loadOfflineStatsBundle(): Promise<TurkeyStatsBundle | null> {
   try {
     const turkeyRes = await fetch(TURKEY_BUNDLE_URL, { cache: "force-cache" });
     if (turkeyRes.ok) {
       return (await turkeyRes.json()) as TurkeyStatsBundle;
     }
   } catch (error) {
-    console.warn("[GlobalStats] Failed to load offline stats bundle", error);
+    console.warn("[GlobalStats] Failed to load offline Turkey stats bundle", error);
   }
   return null;
 }
 
-export const loadTurkeyStatsBundle = loadGlobalStatsBundle;
+export const loadGlobalStatsBundle = loadOfflineStatsBundle;
+export const loadTurkeyStatsBundle = loadOfflineStatsBundle;
+
+export async function downloadWorldwideStats(
+  onProgress?: (message: string, percent: number) => void
+): Promise<{ count: number; teams: GlobalTeamProfile[] }> {
+  onProgress?.("Connecting to Statbotics global teams index...", 10);
+
+  // 1. Fetch all teams directory from Statbotics
+  const teamsMap = new Map<number, GlobalTeamProfile>();
+  let offset = 0;
+  const limit = 1000;
+
+  while (true) {
+    const page = await proxyGetJson<StatboticsTeamResponse[]>(
+      "statbotics",
+      `/teams?limit=${limit}&offset=${offset}`
+    );
+    if (!Array.isArray(page) || page.length === 0) break;
+
+    for (const raw of page) {
+      const num = asNumber(raw.team);
+      if (num) {
+        teamsMap.set(num, {
+          teamNumber: num,
+          name: raw.name || `Team ${num}`,
+          country: raw.country,
+          state: raw.state,
+          districtCode: raw.district?.toUpperCase() || null,
+          rookieYear: raw.rookie_year,
+          active: Boolean(raw.active),
+          lastActiveYear: raw.last_active_year,
+          careerRecord: compactRecord(raw.record),
+          normEpa: compactNormEpa(raw.norm_epa),
+          years: [],
+          source: "online",
+          updatedAt: Date.now(),
+        });
+      }
+    }
+    const currentPct = Math.min(45, 10 + Math.round((teamsMap.size / 3800) * 35));
+    onProgress?.(`Loaded ${teamsMap.size} worldwide teams...`, currentPct);
+    if (page.length < limit) break;
+    offset += limit;
+  }
+
+  // 2. Fetch current 2026 season stats for all teams
+  onProgress?.("Pulling 2026 season EPA telemetry & global rankings...", 50);
+  offset = 0;
+  let yearCount = 0;
+
+  while (true) {
+    const page = await proxyGetJson<StatboticsTeamYearResponse[]>(
+      "statbotics",
+      `/team_years?year=2026&limit=${limit}&offset=${offset}`
+    );
+    if (!Array.isArray(page) || page.length === 0) break;
+
+    for (const raw of page) {
+      const num = asNumber(raw.team);
+      const compacted = compactYear(raw);
+      if (num && compacted) {
+        const team = teamsMap.get(num);
+        if (team) {
+          team.years = [compacted];
+          if (compacted.epaNorm != null) {
+            team.normEpa = { ...team.normEpa, current: compacted.epaNorm };
+          }
+        }
+        yearCount++;
+      }
+    }
+    const currentPct = Math.min(75, 50 + Math.round((yearCount / 3500) * 25));
+    onProgress?.(`Loaded 2026 telemetry (${yearCount} teams)...`, currentPct);
+    if (page.length < limit) break;
+    offset += limit;
+  }
+
+  // 3. Enrich official FIRST Inspires 2026 rosters (schools, districts, robot names)
+  onProgress?.("Enriching official schools, districts & robot names...", 80);
+  try {
+    let page = 1;
+    let totalPages = 1;
+    while (page <= totalPages && page <= 40) {
+      const resp = await proxyGetJson<{
+        teams?: Array<{
+          teamNumber: number;
+          nameShort?: string;
+          nameFull?: string;
+          schoolName?: string | null;
+          robotName?: string | null;
+          districtCode?: string | null;
+          city?: string;
+          stateProv?: string;
+          country?: string;
+          rookieYear?: number;
+          website?: string;
+        }>;
+        pageTotal?: number;
+      }>("first", `/2026/teams?page=${page}`);
+
+      totalPages = resp.pageTotal || totalPages;
+      const pageTeams = resp.teams || [];
+
+      for (const t of pageTeams) {
+        if (!t.teamNumber) continue;
+        const existing = teamsMap.get(t.teamNumber);
+        if (existing) {
+          if (t.schoolName?.trim()) existing.schoolName = t.schoolName.trim();
+          if (t.robotName?.trim()) existing.robotName = t.robotName.trim();
+          if (t.nameFull?.trim()) existing.fullName = t.nameFull.trim();
+          if (t.website?.trim()) existing.website = t.website.trim();
+          if (t.districtCode?.trim()) existing.districtCode = t.districtCode.trim().toUpperCase();
+          if (t.city) existing.city = t.city;
+        } else {
+          teamsMap.set(t.teamNumber, {
+            teamNumber: t.teamNumber,
+            name: t.nameShort || `Team ${t.teamNumber}`,
+            fullName: t.nameFull?.trim() || null,
+            schoolName: t.schoolName?.trim() || null,
+            robotName: t.robotName?.trim() || null,
+            districtCode: t.districtCode?.trim().toUpperCase() || null,
+            city: t.city,
+            state: t.stateProv,
+            country: t.country,
+            website: t.website?.trim() || null,
+            rookieYear: t.rookieYear,
+            years: [],
+            active: true,
+            source: "first",
+            updatedAt: Date.now(),
+          });
+        }
+      }
+      onProgress?.(
+        `Enriching official FIRST rosters (${Math.round((page / totalPages) * 100)}%)...`,
+        Math.min(95, 80 + Math.round((page / totalPages) * 15))
+      );
+      if (page >= totalPages) break;
+      page++;
+    }
+  } catch (err) {
+    console.warn("[GlobalStats] FIRST API enrichment error (non-fatal):", err);
+  }
+
+  onProgress?.("Writing worldwide pack to IndexedDB offline storage...", 98);
+  const allTeams = Array.from(teamsMap.values());
+  return { count: allTeams.length, teams: allTeams };
+}
 
 export async function syncSeasonFromStatbotics(
   year: number,

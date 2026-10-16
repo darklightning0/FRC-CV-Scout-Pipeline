@@ -143,7 +143,7 @@ export function matchesGlobalStatsFilters(
   const awardsStr = (team.awards ?? []).map((a) => `${a.year} ${a.name}`).join(" ");
   const canon = canonicalCity(team.city, team.state);
   const haystack = foldLocation(
-    `${team.teamNumber} ${team.name} ${team.schoolName ?? ""} ${team.robotName ?? ""} ${team.districtCode ?? ""} ${canon} ${team.city ?? ""} ${team.state ?? ""} ${team.country ?? ""} ${awardsStr}`
+    `${team.teamNumber} ${team.name} ${team.fullName ?? ""} ${team.schoolName ?? ""} ${team.robotName ?? ""} ${team.districtCode ?? ""} ${canon} ${team.city ?? ""} ${team.state ?? ""} ${team.country ?? ""} ${awardsStr}`
   );
   return haystack.includes(query);
 }

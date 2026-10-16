@@ -84,6 +84,7 @@ export type TurkeyStatsBundle = GlobalStatsBundle;
 export type GlobalStatsSortField =
   | "teamNumber"
   | "name"
+  | "robotName"
   | "epa"
   | "auto"
   | "teleop"

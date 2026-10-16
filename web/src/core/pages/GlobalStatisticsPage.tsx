@@ -147,6 +147,10 @@ export default function GlobalStatisticsPage() {
     loading,
     lookupLoading,
     syncLoading,
+    downloadingGlobal,
+    downloadProgress,
+    hasWorldwideData,
+    downloadGlobalData,
     error,
     bundleGeneratedAt,
     countryOptions,
@@ -222,6 +226,18 @@ export default function GlobalStatisticsPage() {
         `Synced ${res.updated} teams for ${res.year} (Statbotics EPA & FIRST Inspires official rosters)!`,
         { id: "sync-all" }
       );
+    }
+  };
+
+  const handleDownloadGlobal = async () => {
+    toast.loading("Initiating worldwide teams download...", { id: "global-download" });
+    const res = await downloadGlobalData();
+    if (res.success) {
+      toast.success(`Downloaded and cached ${res.count?.toLocaleString()} global teams!`, {
+        id: "global-download",
+      });
+    } else {
+      toast.error(`Download failed: ${res.error}`, { id: "global-download" });
     }
   };
 
@@ -331,6 +347,32 @@ export default function GlobalStatisticsPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {!hasWorldwideData ? (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleDownloadGlobal}
+                disabled={downloadingGlobal}
+                className="gap-2 text-xs h-9 bg-primary text-primary-foreground shadow-xs font-semibold hover:bg-primary/90"
+              >
+                <HardDriveDownload className={`h-3.5 w-3.5 ${downloadingGlobal ? "animate-bounce" : ""}`} />
+                {downloadingGlobal ? "Downloading Global Data..." : "Download Global Data (3,800+ Teams)"}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadGlobal}
+                disabled={downloadingGlobal}
+                className="gap-1.5 text-xs h-9 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/15 font-semibold"
+                title="Global archive is installed in your offline browser storage. Click to refresh."
+              >
+                <Globe2 className="h-3.5 w-3.5 text-emerald-500" />
+                <span>Global Pack ({teams.length.toLocaleString()})</span>
+                <RefreshCw className={`h-3 w-3 ml-1 ${downloadingGlobal ? "animate-spin text-emerald-500" : "opacity-70"}`} />
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"
@@ -339,11 +381,53 @@ export default function GlobalStatisticsPage() {
               className="gap-2 text-xs h-9 border-primary/30 hover:border-primary/60 hover:bg-primary/5 text-primary shadow-xs font-semibold"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${syncLoading ? "animate-spin text-primary" : "text-primary"}`} />
-              {syncLoading ? "Syncing All Sources..." : `Sync Live Data (${filters.year === "all" ? "2026" : filters.year})`}
+              {syncLoading ? "Syncing All Sources..." : `Sync Live (${filters.year === "all" ? "2026" : filters.year})`}
             </Button>
             <DataAttribution sources={["tba", "statbotics", "first"]} variant="compact" />
           </div>
         </div>
+
+        {/* Global Download Progress Bar Banner */}
+        {downloadingGlobal && downloadProgress && (
+          <Card className="border-primary/40 bg-primary/5 shadow-md p-4 animate-in fade-in slide-in-from-top-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-medium">
+              <div className="flex items-center gap-2">
+                <HardDriveDownload className="h-4 w-4 text-primary animate-bounce shrink-0" />
+                <span className="font-semibold text-foreground">{downloadProgress.message}</span>
+              </div>
+              <span className="font-mono font-bold text-primary">{downloadProgress.percent}%</span>
+            </div>
+            <div className="w-full h-2.5 bg-primary/15 rounded-full overflow-hidden mt-2.5">
+              <div
+                className="h-full bg-primary transition-all duration-300 ease-out"
+                style={{ width: `${downloadProgress.percent}%` }}
+              />
+            </div>
+          </Card>
+        )}
+
+        {/* Offline Turkey Pack Info Notice if Global data is not downloaded yet */}
+        {!hasWorldwideData && (
+          <div className="p-3 bg-muted/60 border rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Info className="h-4 w-4 text-primary shrink-0" />
+              <span>
+                <strong>Offline Turkey pack active:</strong> All 407 Turkish teams are stored locally with robot names, official schools, sponsors, and multi-year telemetry.
+                To browse all 3,800+ teams worldwide, download the global archive on-demand.
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={handleDownloadGlobal}
+              disabled={downloadingGlobal}
+              className="h-7 text-xs font-semibold gap-1.5 shrink-0 self-start sm:self-auto bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <HardDriveDownload className="h-3.5 w-3.5" />
+              Download Global Data
+            </Button>
+          </div>
+        )}
 
         {/* KPI Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -356,22 +440,24 @@ export default function GlobalStatisticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0 text-[11px] text-muted-foreground">
-              {bundleGeneratedAt
-                ? `Global archive updated ${new Date(bundleGeneratedAt).toLocaleDateString()}`
-                : "Full global pack stored locally for zero-latency offline use"}
+              {hasWorldwideData
+                ? `Worldwide archive stored locally (${teams.length.toLocaleString()} teams)`
+                : bundleGeneratedAt
+                  ? `407 Turkey teams stored offline (${new Date(bundleGeneratedAt).toLocaleDateString()})`
+                  : "All 407 Turkey teams stored locally with zero Cloudflare 25MB impact"}
             </CardContent>
           </Card>
 
           <Card className="bg-card/50">
             <CardHeader className="p-3 pb-1">
-              <CardDescription className="text-xs">FIRST Verified</CardDescription>
+              <CardDescription className="text-xs">Robot Names</CardDescription>
               <CardTitle className="text-lg flex items-center gap-2 font-bold text-amber-600 dark:text-amber-400">
                 <Bot className="h-4 w-4 text-amber-500" />
-                {teams.filter((t) => t.schoolName || t.districtCode || t.source === "first").length} Teams
+                {teams.filter((t) => Boolean(t.robotName)).length} Named Bots
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0 text-[11px] text-muted-foreground">
-              Official schools & districts
+              Official FIRST & TBA robot identifiers
             </CardContent>
           </Card>
 
@@ -384,7 +470,7 @@ export default function GlobalStatisticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0 text-[11px] text-muted-foreground">
-              {filters.city !== "all" ? `Filtered by ${filters.city}` : "All loaded regions"}
+              {filters.city !== "all" ? `Filtered by ${filters.city}` : "All matching teams"}
             </CardContent>
           </Card>
 
@@ -645,6 +731,12 @@ export default function GlobalStatisticsPage() {
                     >
                       Name {getSortIcon("name")}
                     </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-muted/70 font-semibold text-center"
+                      onClick={() => toggleSort("robotName")}
+                    >
+                      Robot {getSortIcon("robotName")}
+                    </TableHead>
                     <TableHead className="font-semibold">Location</TableHead>
                     <TableHead
                       className="cursor-pointer hover:bg-muted/70 font-semibold text-center"
@@ -732,16 +824,39 @@ export default function GlobalStatisticsPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium max-w-[220px]" title={team.name}>
-                        <div className="truncate font-semibold">{team.name}</div>
-                        {(team.schoolName || team.robotName) && (
-                          <div className="text-[11px] text-muted-foreground truncate font-normal" title={team.schoolName || undefined}>
-                            {team.robotName ? `🤖 ${team.robotName} · ` : ""}{team.schoolName || ""}
+                      <TableCell className="font-medium max-w-[240px]" title={team.fullName || team.name}>
+                        <div className="truncate font-bold text-foreground text-sm">{team.name}</div>
+                        {team.schoolName && (
+                          <div className="text-[11px] text-muted-foreground truncate font-normal mt-0.5" title={team.schoolName}>
+                            🏫 {team.schoolName}
                           </div>
+                        )}
+                        {!team.schoolName && team.fullName && (
+                          <div className="text-[10px] text-muted-foreground/80 truncate font-normal mt-0.5" title={team.fullName}>
+                            {team.fullName}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center font-mono text-xs">
+                        {team.robotName ? (
+                          <Badge
+                            variant="outline"
+                            className="gap-1 text-[11px] font-semibold border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 font-mono"
+                          >
+                            <Bot className="h-3 w-3 text-amber-500 shrink-0" />
+                            <span>{team.robotName}</span>
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground/40 text-xs">—</span>
                         )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {formatTeamLocation(team)}
+                        {team.postalCode && (
+                          <span className="text-[10px] text-muted-foreground/70 block font-mono">
+                            {team.postalCode}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-center font-mono text-xs">
                         {filters.year === "all" ? formatRecord(team.careerRecord) : formatRecord(year?.record)}
@@ -760,7 +875,25 @@ export default function GlobalStatisticsPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-center font-bold text-primary">
-                        {formatNum(year?.epaTotal ?? team.normEpa?.current)}
+                        <div className="text-sm font-extrabold">{formatNum(year?.epaTotal ?? team.normEpa?.current)}</div>
+                        {filters.year === "all" && team.years && team.years.length > 0 && (
+                          <div className="flex flex-wrap items-center justify-center gap-1 mt-1 max-w-[220px] mx-auto">
+                            {[...team.years]
+                              .filter((y) => y.epaTotal != null)
+                              .slice(-4)
+                              .reverse()
+                              .map((y) => (
+                                <span
+                                  key={y.year}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-muted/80 hover:bg-muted font-mono border border-border/50 text-foreground/80 flex items-center gap-0.5 transition-colors"
+                                  title={`${y.year} Season EPA: ${y.epaTotal?.toFixed(1)} (World #${y.ranks?.worldRank ?? '—'}, Country #${y.ranks?.countryRank ?? '—'})`}
+                                >
+                                  <span className="text-muted-foreground font-semibold">'{String(y.year).slice(-2)}:</span>
+                                  <span className="font-bold text-primary">{y.epaTotal?.toFixed(1)}</span>
+                                </span>
+                              ))}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-center text-xs hidden md:table-cell">
                         {formatNum(year?.epaAuto)}
@@ -772,7 +905,26 @@ export default function GlobalStatisticsPage() {
                         {formatNum(year?.epaEndgame)}
                       </TableCell>
                       <TableCell className="text-center text-xs font-semibold text-amber-500 hidden md:table-cell">
-                        {formatNum(year?.epaMax ?? team.normEpa?.max)}
+                        {(() => {
+                          const validYears = (team.years || []).filter((y) => y.epaTotal != null);
+                          let peakYearEntry: GlobalTeamYear | null = validYears[0] ?? null;
+                          for (const y of validYears) {
+                            if ((y.epaTotal ?? 0) > (peakYearEntry?.epaTotal ?? 0)) {
+                              peakYearEntry = y;
+                            }
+                          }
+                          const peakVal = team.normEpa?.max ?? peakYearEntry?.epaTotal ?? year?.epaMax;
+                          return (
+                            <div>
+                              <span className="font-bold text-amber-500">{formatNum(peakVal)}</span>
+                              {filters.year === "all" && peakYearEntry && peakYearEntry.year && (
+                                <span className="block text-[10px] text-muted-foreground font-mono">
+                                  '{String(peakYearEntry.year).slice(-2)} Peak
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-center text-xs hidden lg:table-cell">
                         {year?.ranks.worldRank ? (
@@ -1052,24 +1204,66 @@ export default function GlobalStatisticsPage() {
                       {selectedTeam.rookieYear ? ` · Rookie ${selectedTeam.rookieYear}` : ""}
                       {selectedTeam.lastActiveYear ? ` · Last Active ${selectedTeam.lastActiveYear}` : ""}
                     </DialogDescription>
-                    {(selectedTeam.districtCode || selectedTeam.schoolName || selectedTeam.robotName || enrichedFirstData?.robotName || enrichedFirstData?.schoolName) && (
-                      <div className="flex flex-wrap items-center gap-2 mt-2 pt-1 border-t border-border/50 text-xs">
-                        {(selectedTeam.districtCode || enrichedFirstData?.districtCode) && (
-                          <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono font-medium px-2 py-0.5 rounded border border-amber-500/20">
-                            District: {selectedTeam.districtCode || enrichedFirstData?.districtCode}
-                          </span>
-                        )}
-                        {(selectedTeam.robotName || enrichedFirstData?.robotName) && (
-                          <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium px-2 py-0.5 rounded border border-amber-500/20">
-                            <Bot className="h-3 w-3" />
-                            Robot: {selectedTeam.robotName || enrichedFirstData?.robotName}
-                          </span>
-                        )}
-                        {(selectedTeam.schoolName || enrichedFirstData?.schoolName) && (
-                          <span className="text-muted-foreground truncate max-w-md">
-                            🏫 {selectedTeam.schoolName || enrichedFirstData?.schoolName}
-                          </span>
-                        )}
+                    {/* Key Team Identifiers Strip */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-3 pt-3 border-t">
+                      {/* Robot Name */}
+                      <div className="p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 flex items-center gap-2.5">
+                        <Bot className="h-5 w-5 text-amber-500 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-[10px] uppercase font-bold tracking-wider text-amber-600 dark:text-amber-400">
+                            Robot Name
+                          </div>
+                          <div className="font-bold text-sm truncate text-foreground font-mono">
+                            {selectedTeam.robotName || enrichedFirstData?.robotName || "—"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* School / Institution */}
+                      <div className="p-2.5 rounded-lg border border-border/60 bg-muted/30 flex items-center gap-2.5">
+                        <div className="text-base shrink-0">🏫</div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                            School / Institution
+                          </div>
+                          <div className="font-semibold text-xs truncate text-foreground" title={selectedTeam.schoolName || enrichedFirstData?.schoolName || undefined}>
+                            {selectedTeam.schoolName || enrichedFirstData?.schoolName || "Community / Independent"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* District */}
+                      <div className="p-2.5 rounded-lg border border-border/60 bg-muted/30 flex items-center gap-2.5">
+                        <div className="text-base shrink-0">🛡️</div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                            FIRST District
+                          </div>
+                          <div className="font-semibold text-xs truncate text-foreground font-mono">
+                            {selectedTeam.districtCode || enrichedFirstData?.districtCode || "Regional Division"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Postal Code & Region */}
+                      <div className="p-2.5 rounded-lg border border-border/60 bg-muted/30 flex items-center gap-2.5">
+                        <div className="text-base shrink-0">📍</div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                            Location & Postal
+                          </div>
+                          <div className="font-semibold text-xs truncate text-foreground font-mono">
+                            {selectedTeam.postalCode ? `${selectedTeam.postalCode} · ` : ""}{formatTeamLocation(selectedTeam)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sponsors & Affiliations box */}
+                    {(selectedTeam.fullName || enrichedFirstData?.nameFull) && (
+                      <div className="mt-2.5 p-2.5 rounded-lg bg-muted/20 border text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground block mb-0.5">Sponsors & Corporate Partners:</span>
+                        <span className="leading-relaxed line-clamp-3">{selectedTeam.fullName || enrichedFirstData?.nameFull}</span>
                       </div>
                     )}
                   </div>
@@ -1283,8 +1477,38 @@ export default function GlobalStatisticsPage() {
               )}
 
               {/* Year by Year Progression */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold text-foreground">Season by Season Progression</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                    <BarChart3 className="h-4 w-4 text-primary" />
+                    All-Time Season Progression ({selectedTeam.years.length} Years)
+                  </h3>
+                  <span className="text-xs text-muted-foreground">
+                    Peak EPA: <strong className="text-amber-500 font-mono font-bold">{formatNum(selectedTeam.normEpa?.max, 0)}</strong>
+                  </span>
+                </div>
+
+                {/* All-Year EPA Quick Badges Strip */}
+                {selectedTeam.years.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 p-2.5 rounded-lg bg-muted/20 border">
+                    {[...selectedTeam.years].reverse().map((y) => (
+                      <div
+                        key={y.year}
+                        className="px-2.5 py-1 rounded-md border bg-card/80 flex items-center gap-2 text-xs font-mono shadow-2xs hover:bg-muted/50 transition-colors"
+                        title={`${y.year} Season Breakdown: Auto ${y.epaAuto ?? '—'}, Teleop ${y.epaTeleop ?? '—'}, Endgame ${y.epaEndgame ?? '—'}`}
+                      >
+                        <span className="font-bold text-foreground">{y.year}</span>
+                        <span className="text-primary font-bold">{formatNum(y.epaTotal, 1)}</span>
+                        {y.ranks?.countryRank && (
+                          <span className="text-[10px] text-muted-foreground">
+                            TR #{y.ranks.countryRank}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <TeamYearTable years={selectedTeam.years} />
               </div>
             </div>

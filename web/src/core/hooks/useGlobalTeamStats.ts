@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchGlobalTeamFromApis, loadGlobalStatsBundle, syncSeasonFromStatbotics, syncSeasonFromFirstApi } from "@/core/lib/global-stats/api";
+import {
+  fetchGlobalTeamFromApis,
+  loadGlobalStatsBundle,
+  syncSeasonFromStatbotics,
+  syncSeasonFromFirstApi,
+  downloadWorldwideStats,
+} from "@/core/lib/global-stats/api";
 import { loadCachedGlobalTeams, putCachedGlobalTeam, putCachedGlobalTeams } from "@/core/lib/global-stats/cache";
 import { canonicalCity, isTurkeyCountry, matchesGlobalStatsFilters, yearForDisplay } from "@/core/lib/global-stats/normalize";
 import type { GlobalStatsFilters, GlobalStatsSortField, GlobalTeamProfile } from "@/core/lib/global-stats/types";
@@ -43,20 +49,53 @@ function readStoredFilters(): GlobalStatsFilters {
 }
 
 function mergeTeams(existing: GlobalTeamProfile[], incoming: GlobalTeamProfile[]): GlobalTeamProfile[] {
-  const byNumber = new Map(existing.map((team) => [team.teamNumber, team]));
+  const byNumber = new Map(existing.map((team) => [team.teamNumber, { ...team }]));
   for (const team of incoming) {
-    const previous = byNumber.get(team.teamNumber);
-    if (!previous || (team.updatedAt ?? 0) >= (previous.updatedAt ?? 0)) {
-      byNumber.set(team.teamNumber, {
-        ...previous,
-        ...team,
-        districtCode: team.districtCode ?? previous?.districtCode,
-        schoolName: team.schoolName ?? previous?.schoolName,
-        robotName: team.robotName ?? previous?.robotName,
-        awards: team.awards?.length ? team.awards : previous?.awards,
-        years: team.years.length ? team.years : previous?.years ?? [],
-      });
+    const prev = byNumber.get(team.teamNumber);
+    if (!prev) {
+      byNumber.set(team.teamNumber, { ...team });
+      continue;
     }
+
+    // Merge years: keep whichever has more years or combine them
+    let mergedYears = prev.years ?? [];
+    if ((team.years?.length ?? 0) >= (prev.years?.length ?? 0)) {
+      mergedYears = team.years;
+    } else if (team.years?.length) {
+      const yearsMap = new Map((prev.years ?? []).map((y) => [y.year, y]));
+      for (const y of team.years) {
+        yearsMap.set(y.year, { ...(yearsMap.get(y.year) ?? {}), ...y });
+      }
+      mergedYears = [...yearsMap.values()].sort((a, b) => a.year - b.year);
+    }
+
+    // Merge awards: keep whichever has more awards
+    const mergedAwards = (team.awards?.length ?? 0) >= (prev.awards?.length ?? 0)
+      ? team.awards
+      : prev.awards;
+
+    byNumber.set(team.teamNumber, {
+      ...prev,
+      ...team,
+      name: team.name || prev.name,
+      fullName: team.fullName?.trim() || prev.fullName?.trim() || null,
+      schoolName: team.schoolName?.trim() || prev.schoolName?.trim() || null,
+      robotName: team.robotName?.trim() || prev.robotName?.trim() || null,
+      districtCode: team.districtCode?.trim() || prev.districtCode?.trim() || null,
+      city: team.city || prev.city,
+      state: team.state || prev.state,
+      country: team.country || prev.country,
+      website: team.website?.trim() || prev.website?.trim() || null,
+      postalCode: team.postalCode || prev.postalCode || null,
+      rookieYear: team.rookieYear ?? prev.rookieYear,
+      active: team.active ?? prev.active,
+      careerRecord: team.careerRecord || prev.careerRecord,
+      normEpa: team.normEpa || prev.normEpa,
+      years: mergedYears,
+      awards: mergedAwards,
+      source: team.source === "offline" ? "offline" : (prev.source || team.source),
+      updatedAt: Math.max(team.updatedAt ?? 0, prev.updatedAt ?? 0, Date.now()),
+    });
   }
   return [...byNumber.values()].sort((a, b) => a.teamNumber - b.teamNumber);
 }
@@ -67,6 +106,8 @@ export function useGlobalTeamStats() {
   const [loading, setLoading] = useState(true);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [downloadingGlobal, setDownloadingGlobal] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{ message: string; percent: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [bundleGeneratedAt, setBundleGeneratedAt] = useState<number | null>(null);
 
@@ -88,11 +129,12 @@ export function useGlobalTeamStats() {
         const [cached, bundle] = await Promise.all([loadCachedGlobalTeams(), loadGlobalStatsBundle()]);
         if (cancelled) return;
         const bundleTeams = (bundle?.teams ?? []).map((team: GlobalTeamProfile) => ({ ...team, source: "offline" as const }));
-        if (bundleTeams.length > 0) {
-          await putCachedGlobalTeams(bundleTeams);
+        const merged = mergeTeams(cached, bundleTeams);
+        if (merged.length > 0) {
+          await putCachedGlobalTeams(merged);
         }
         setBundleGeneratedAt(bundle?.generatedAt ?? null);
-        setTeams(mergeTeams(cached, bundleTeams));
+        setTeams(merged);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : "Failed to load team statistics");
@@ -170,6 +212,10 @@ export function useGlobalTeamStats() {
           return (a.teamNumber - b.teamNumber) * dir;
         case "name":
           return a.name.localeCompare(b.name) * dir;
+        case "robotName":
+          valA = a.robotName ?? "";
+          valB = b.robotName ?? "";
+          break;
         case "awards":
           valA = a.awards?.length ?? 0;
           valB = b.awards?.length ?? 0;
@@ -516,6 +562,50 @@ export function useGlobalTeamStats() {
     [filters.year, teams]
   );
 
+  const hasWorldwideData = useMemo(() => {
+    return teams.some((t) => t.country && !isTurkeyCountry(t.country));
+  }, [teams]);
+
+  const downloadGlobalData = useCallback(async () => {
+    setDownloadingGlobal(true);
+    setError(null);
+    setDownloadProgress({ message: "Connecting to Statbotics global directory...", percent: 5 });
+    try {
+      const result = await downloadWorldwideStats((message, percent) => {
+        setDownloadProgress({ message, percent });
+      });
+
+      setDownloadProgress({
+        message: `Saving ${result.count.toLocaleString()} worldwide teams to local cache...`,
+        percent: 96,
+      });
+
+      let updatedTeams: GlobalTeamProfile[] = [];
+      setTeams((prevTeams) => {
+        const merged = mergeTeams(prevTeams, result.teams);
+        updatedTeams = merged;
+        void putCachedGlobalTeams(merged);
+        return merged;
+      });
+
+      setDownloadProgress({
+        message: `Successfully installed ${result.count.toLocaleString()} global teams!`,
+        percent: 100,
+      });
+
+      return { success: true, count: result.count, teams: updatedTeams };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to download worldwide telemetry";
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setTimeout(() => {
+        setDownloadingGlobal(false);
+        setDownloadProgress(null);
+      }, 1200);
+    }
+  }, []);
+
   return {
     teams,
     filteredTeams,
@@ -524,6 +614,10 @@ export function useGlobalTeamStats() {
     loading,
     lookupLoading,
     syncLoading,
+    downloadingGlobal,
+    downloadProgress,
+    hasWorldwideData,
+    downloadGlobalData,
     error,
     bundleGeneratedAt,
     countryOptions,
