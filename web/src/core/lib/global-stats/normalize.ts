@@ -102,12 +102,18 @@ export function yearForDisplay(team: GlobalTeamProfile, yearFilter: string): Glo
   return team.years[team.years.length - 1] ?? null;
 }
 
+export function isTeamActive(team: { active?: boolean | null; lastActiveYear?: number | null }): boolean {
+  if (team.active) return true;
+  if (team.lastActiveYear && team.lastActiveYear >= 2024) return true;
+  return false;
+}
+
 export function matchesGlobalStatsFilters(
   team: GlobalTeamProfile,
   filters: GlobalStatsFilters
 ): boolean {
   if (filters.offlineOnly && team.source !== "offline") return false;
-  if (filters.activeOnly && !team.active) return false;
+  if (filters.activeOnly && !isTeamActive(team)) return false;
   if (filters.hasAwardsOnly && (!team.awards || team.awards.length === 0)) return false;
 
   if (filters.country && filters.country !== "all") {

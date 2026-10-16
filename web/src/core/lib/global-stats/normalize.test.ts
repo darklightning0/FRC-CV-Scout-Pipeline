@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalCity, foldLocation, matchesGlobalStatsFilters } from "./normalize";
+import { canonicalCity, foldLocation, isTeamActive, matchesGlobalStatsFilters } from "./normalize";
 import type { GlobalTeamProfile } from "./types";
 
 const team = (overrides: Partial<GlobalTeamProfile> = {}): GlobalTeamProfile => ({
@@ -42,4 +42,34 @@ describe("global stats location filters", () => {
     expect(matchesGlobalStatsFilters(izmirDistrict, filters)).toBe(true);
     expect(matchesGlobalStatsFilters(istanbul, filters)).toBe(false);
   });
+
+  it("correctly identifies active teams even if statbotics sets active to false but team competed in 2024-2026", () => {
+    const celestial9070 = team({
+      teamNumber: 9070,
+      name: "CELESTIAL",
+      active: false,
+      lastActiveYear: 2025,
+    });
+    expect(isTeamActive(celestial9070)).toBe(true);
+
+    const oldInactiveTeam = team({
+      teamNumber: 1,
+      name: "Old Team",
+      active: false,
+      lastActiveYear: 2018,
+    });
+    expect(isTeamActive(oldInactiveTeam)).toBe(false);
+
+    const filters = {
+      search: "",
+      country: "all",
+      city: "all",
+      year: "all",
+      activeOnly: true,
+      offlineOnly: false,
+    };
+    expect(matchesGlobalStatsFilters(celestial9070, filters)).toBe(true);
+    expect(matchesGlobalStatsFilters(oldInactiveTeam, filters)).toBe(false);
+  });
 });
+

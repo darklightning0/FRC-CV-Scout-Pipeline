@@ -189,6 +189,10 @@ def main() -> None:
         if first_info and first_info.get("districtCode"):
             t["districtCode"] = first_info["districtCode"].strip()
 
+        # Preserve active status if team was active recently (2024-2026)
+        if t.get("active") or (t.get("lastActiveYear") and t["lastActiveYear"] >= 2024):
+            t["active"] = True
+
         t["source"] = "offline"
         enriched_count += 1
 

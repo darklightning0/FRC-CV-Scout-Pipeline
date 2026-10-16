@@ -13,7 +13,7 @@ import {
   putCachedGlobalTeam,
   putCachedGlobalTeams,
 } from "@/core/lib/global-stats/cache";
-import { canonicalCity, isTurkeyCountry, matchesGlobalStatsFilters, yearForDisplay } from "@/core/lib/global-stats/normalize";
+import { canonicalCity, isTeamActive, isTurkeyCountry, matchesGlobalStatsFilters, yearForDisplay } from "@/core/lib/global-stats/normalize";
 import type { GlobalStatsFilters, GlobalStatsSortField, GlobalTeamProfile } from "@/core/lib/global-stats/types";
 
 const FILTERS_STORAGE_KEY = "global_stats_filters";
@@ -94,7 +94,8 @@ function mergeTeams(existing: GlobalTeamProfile[], incoming: GlobalTeamProfile[]
       website: team.website?.trim() || prev.website?.trim() || null,
       postalCode: team.postalCode || prev.postalCode || null,
       rookieYear: team.rookieYear ?? prev.rookieYear,
-      active: team.active ?? prev.active,
+      active: isTeamActive(team) || isTeamActive(prev),
+      lastActiveYear: team.lastActiveYear ?? prev.lastActiveYear,
       careerRecord: team.careerRecord || prev.careerRecord,
       normEpa: team.normEpa || prev.normEpa,
       years: mergedYears,
@@ -134,7 +135,11 @@ export function useGlobalTeamStats() {
       try {
         const [cached, bundle] = await Promise.all([loadCachedGlobalTeams(), loadGlobalStatsBundle()]);
         if (cancelled) return;
-        const bundleTeams = (bundle?.teams ?? []).map((team: GlobalTeamProfile) => ({ ...team, source: "offline" as const }));
+        const bundleTeams = (bundle?.teams ?? []).map((team: GlobalTeamProfile) => ({
+          ...team,
+          source: "offline" as const,
+          active: isTeamActive(team),
+        }));
         const merged = mergeTeams(cached, bundleTeams);
         if (merged.length > 0) {
           await putCachedGlobalTeams(merged);

@@ -50,6 +50,7 @@ import { useGlobalTeamStats } from "@/core/hooks/useGlobalTeamStats";
 import {
   canonicalCity,
   formatTeamLocation,
+  isTeamActive,
   isTurkeyCountry,
   yearForDisplay,
 } from "@/core/lib/global-stats/normalize";
@@ -278,7 +279,7 @@ export default function GlobalStatisticsPage() {
 
   const izmirCount = useMemo(() => {
     return teams.filter(
-      (t) => canonicalCity(t.city, t.state) === "Izmir" && (!filters.activeOnly || t.active)
+      (t) => canonicalCity(t.city, t.state) === "Izmir" && (!filters.activeOnly || isTeamActive(t))
     ).length;
   }, [teams, filters.activeOnly]);
 
@@ -830,7 +831,7 @@ export default function GlobalStatisticsPage() {
                               '{String(team.rookieYear).slice(-2)}
                             </span>
                           )}
-                          {!team.active && (
+                          {!isTeamActive(team) && (
                             <span className="px-1 py-0.2 rounded text-[9px] bg-muted text-muted-foreground">
                               Inactive
                             </span>
@@ -1201,7 +1202,7 @@ export default function GlobalStatisticsPage() {
                       <DialogTitle className="text-2xl font-bold">
                         Team {selectedTeam.teamNumber} · {selectedTeam.name}
                       </DialogTitle>
-                      {selectedTeam.active ? (
+                      {isTeamActive(selectedTeam) ? (
                         <Badge variant="default" className="text-xs bg-emerald-600">Active</Badge>
                       ) : (
                         <Badge variant="secondary" className="text-xs">Inactive</Badge>
