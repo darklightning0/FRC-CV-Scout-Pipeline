@@ -6,7 +6,13 @@ import {
   syncSeasonFromFirstApi,
   downloadWorldwideStats,
 } from "@/core/lib/global-stats/api";
-import { loadCachedGlobalTeams, putCachedGlobalTeam, putCachedGlobalTeams } from "@/core/lib/global-stats/cache";
+import {
+  GLOBAL_DATA_DOWNLOADED_KEY,
+  clearNonTurkeyCachedTeams,
+  loadCachedGlobalTeams,
+  putCachedGlobalTeam,
+  putCachedGlobalTeams,
+} from "@/core/lib/global-stats/cache";
 import { canonicalCity, isTurkeyCountry, matchesGlobalStatsFilters, yearForDisplay } from "@/core/lib/global-stats/normalize";
 import type { GlobalStatsFilters, GlobalStatsSortField, GlobalTeamProfile } from "@/core/lib/global-stats/types";
 
@@ -563,7 +569,10 @@ export function useGlobalTeamStats() {
   );
 
   const hasWorldwideData = useMemo(() => {
-    return teams.some((t) => t.country && !isTurkeyCountry(t.country));
+    return (
+      localStorage.getItem(GLOBAL_DATA_DOWNLOADED_KEY) === "true" &&
+      teams.some((t) => t.country && !isTurkeyCountry(t.country))
+    );
   }, [teams]);
 
   const downloadGlobalData = useCallback(async () => {
@@ -588,6 +597,8 @@ export function useGlobalTeamStats() {
         return merged;
       });
 
+      localStorage.setItem(GLOBAL_DATA_DOWNLOADED_KEY, "true");
+
       setDownloadProgress({
         message: `Successfully installed ${result.count.toLocaleString()} global teams!`,
         percent: 100,
@@ -606,6 +617,14 @@ export function useGlobalTeamStats() {
     }
   }, []);
 
+  const clearGlobalData = useCallback(async () => {
+    localStorage.removeItem(GLOBAL_DATA_DOWNLOADED_KEY);
+    await clearNonTurkeyCachedTeams();
+    const bundle = await loadGlobalStatsBundle();
+    const bundleTeams = (bundle?.teams ?? []).map((t) => ({ ...t, source: "offline" as const }));
+    setTeams(bundleTeams);
+  }, []);
+
   return {
     teams,
     filteredTeams,
@@ -618,6 +637,7 @@ export function useGlobalTeamStats() {
     downloadProgress,
     hasWorldwideData,
     downloadGlobalData,
+    clearGlobalData,
     error,
     bundleGeneratedAt,
     countryOptions,

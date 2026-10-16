@@ -50,6 +50,7 @@ import { useGlobalTeamStats } from "@/core/hooks/useGlobalTeamStats";
 import {
   canonicalCity,
   formatTeamLocation,
+  isTurkeyCountry,
   yearForDisplay,
 } from "@/core/lib/global-stats/normalize";
 import type {
@@ -151,6 +152,7 @@ export default function GlobalStatisticsPage() {
     downloadProgress,
     hasWorldwideData,
     downloadGlobalData,
+    clearGlobalData,
     error,
     bundleGeneratedAt,
     countryOptions,
@@ -359,18 +361,29 @@ export default function GlobalStatisticsPage() {
                 {downloadingGlobal ? "Downloading Global Data..." : "Download Global Data (3,800+ Teams)"}
               </Button>
             ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadGlobal}
-                disabled={downloadingGlobal}
-                className="gap-1.5 text-xs h-9 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/15 font-semibold"
-                title="Global archive is installed in your offline browser storage. Click to refresh."
-              >
-                <Globe2 className="h-3.5 w-3.5 text-emerald-500" />
-                <span>Global Pack ({teams.length.toLocaleString()})</span>
-                <RefreshCw className={`h-3 w-3 ml-1 ${downloadingGlobal ? "animate-spin text-emerald-500" : "opacity-70"}`} />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadGlobal}
+                  disabled={downloadingGlobal}
+                  className="gap-1.5 text-xs h-9 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/15 font-semibold"
+                  title="Global archive is installed in your offline browser storage. Click to refresh."
+                >
+                  <Globe2 className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>Global Pack ({teams.length.toLocaleString()})</span>
+                  <RefreshCw className={`h-3 w-3 ml-1 ${downloadingGlobal ? "animate-spin text-emerald-500" : "opacity-70"}`} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearGlobalData}
+                  className="h-9 text-xs text-muted-foreground hover:text-foreground"
+                  title="Remove downloaded worldwide teams and revert to offline Turkey pack"
+                >
+                  Reset to Turkey Pack
+                </Button>
+              </div>
             )}
 
             <Button
@@ -970,8 +983,8 @@ export default function GlobalStatisticsPage() {
                             <Bot className="h-3 w-3 text-amber-500" />
                             FIRST
                           </Badge>
-                        ) : team.source === "offline" ? (
-                          <Badge variant="secondary" className="gap-1 text-[10px] whitespace-nowrap">
+                        ) : isTurkeyCountry(team.country) && team.source === "offline" ? (
+                          <Badge variant="secondary" className="gap-1 text-[10px] whitespace-nowrap text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
                             <WifiOff className="h-3 w-3 text-emerald-500" />
                             Offline
                           </Badge>
